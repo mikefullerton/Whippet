@@ -19,7 +19,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 | Total Steps | Complete | In Progress | Blocked | Not Started |
 |-------------|----------|-------------|---------|-------------|
-| 12          | 2        | 0           | 0       | 10          |
+| 12          | 3        | 0           | 0       | 9           |
 
 ## Implementation Steps
 
@@ -74,21 +74,22 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 - **GitHub Issue**: #4
 - **Type**: Auto
 - **Complexity**: M
+- **Status**: Complete
 - **Dependencies**: Step 2
 - **Acceptance Criteria**:
-  - [ ] App creates `~/.claude/session-events/` on launch if it doesn't exist
-  - [ ] FSEvents or DispatchSource watches the directory for new files
-  - [ ] New `.json` files are read, parsed, and inserted into the `events` table
-  - [ ] Session records in `sessions` table are created/updated based on events
-  - [ ] Consumed files are deleted after successful ingestion
-  - [ ] Malformed JSON files are logged and moved to an `errors/` subdirectory
-  - [ ] Handles concurrent file writes gracefully (file not yet fully written)
+  - [x] App creates `~/.claude/session-events/` on launch if it doesn't exist
+  - [x] FSEvents or DispatchSource watches the directory for new files
+  - [x] New `.json` files are read, parsed, and inserted into the `events` table
+  - [x] Session records in `sessions` table are created/updated based on events
+  - [x] Consumed files are deleted after successful ingestion
+  - [x] Malformed JSON files are logged and moved to an `errors/` subdirectory
+  - [x] Handles concurrent file writes gracefully (file not yet fully written)
 - **Testing / Verification**:
-  - [ ] Unit tests for JSON parsing of all event types
-  - [ ] Integration test: drop a JSON file, verify it appears in the database and the file is deleted
-  - [ ] Stress test: drop 50 files rapidly, verify all are consumed
+  - [x] Unit tests for JSON parsing of all event types
+  - [x] Integration test: drop a JSON file, verify it appears in the database and the file is deleted
+  - [x] Stress test: drop 50 files rapidly, verify all are consumed
 - **PR**: _TBD_
-- **Notes**: JSON file format: `{timestamp}-{uuid}.json` containing `{"event": "...", "session_id": "...", "timestamp": "...", "data": {...}}`
+- **Notes**: Uses DispatchSource file system monitoring with a brief delay (minimumFileAge + 50ms) to handle concurrent writes. EventIngestionManager processes files on a dedicated background queue. 30 tests covering all event types, error handling, and stress scenarios.
 
 ---
 
