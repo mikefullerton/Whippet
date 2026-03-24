@@ -19,7 +19,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 | Total Steps | Complete | In Progress | Blocked | Not Started |
 |-------------|----------|-------------|---------|-------------|
-| 12          | 8        | 0           | 0       | 4           |
+| 12          | 9        | 0           | 0       | 3           |
 
 ## Implementation Steps
 
@@ -218,22 +218,23 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 - **GitHub Issue**: #10
 - **Type**: Auto
 - **Complexity**: M
+- **Status**: Complete
 - **Dependencies**: Steps 5, 7, 8
 - **Acceptance Criteria**:
-  - [ ] Settings window accessible from the menu bar dropdown
-  - [ ] SwiftUI form with sections for: General, Window, Notifications, Actions
-  - [ ] General: staleness timeout (slider or stepper, in seconds/minutes)
-  - [ ] Window: always-on-top toggle, transparency slider
-  - [ ] Notifications: per-event-type toggles (SessionStart, SessionEnd, Stale)
-  - [ ] Actions: click action picker (dropdown), custom shell command text field
-  - [ ] Changes are persisted to SQLite `settings` table immediately
-  - [ ] Changes take effect immediately (no restart required)
+  - [x] Settings window accessible from the menu bar dropdown
+  - [x] SwiftUI form with sections for: General, Window, Notifications, Actions
+  - [x] General: staleness timeout (slider or stepper, in seconds/minutes)
+  - [x] Window: always-on-top toggle, transparency slider
+  - [x] Notifications: per-event-type toggles (SessionStart, SessionEnd, Stale)
+  - [x] Actions: click action picker (dropdown), custom shell command text field
+  - [x] Changes are persisted to SQLite `settings` table immediately
+  - [x] Changes take effect immediately (no restart required)
 - **Testing / Verification**:
-  - [ ] Change each setting, verify it persists after app restart
-  - [ ] Change window settings, verify floating window updates immediately
-  - [ ] Change staleness timeout, verify detection respects new value
+  - [x] Change each setting, verify it persists after app restart
+  - [x] Change window settings, verify floating window updates immediately
+  - [x] Change staleness timeout, verify detection respects new value
 - **PR**: _TBD_
-- **Notes**:
+- **Notes**: SettingsWindowController manages an NSWindow hosting SettingsView (SwiftUI Form with .grouped style). SettingsViewModel (ObservableObject) reads/writes all settings via @Published property didSet observers for immediate persistence. Callbacks wire transparency and always-on-top changes to SessionPanelController in real time. Settings keys are shared with SessionLivenessMonitor (staleness_timeout) and SessionActionHandler (click_action, custom_command_template). 25 unit tests covering persistence, loading, callbacks, value clamping, display formatting, and cross-component integration.
 
 ---
 
