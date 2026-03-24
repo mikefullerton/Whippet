@@ -7,6 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var databaseManager: DatabaseManager?
     private var ingestionManager: EventIngestionManager?
     private var hookInstaller: HookInstaller?
+    private(set) var panelController = SessionPanelController()
 
     // MARK: - App Lifecycle
 
@@ -93,8 +94,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Menu Actions
 
     @objc private func showSessions() {
-        // Placeholder: will open the floating session window in a later step
-        NSLog("Whippet: Show Sessions selected")
+        panelController.togglePanel()
     }
 
     @objc private func openSettings() {

@@ -18,6 +18,10 @@
 		A1000009 /* EventIngestionManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000022 /* EventIngestionManagerTests.swift */; };
 		A100000A /* HookInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000018 /* HookInstaller.swift */; };
 		A100000B /* HookInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000023 /* HookInstallerTests.swift */; };
+		A100000C /* SessionPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000030 /* SessionPanel.swift */; };
+		A100000D /* SessionContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000031 /* SessionContentView.swift */; };
+		A100000E /* SessionPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000032 /* SessionPanelController.swift */; };
+		A100000F /* SessionPanelControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000024 /* SessionPanelControllerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -44,6 +48,10 @@
 		A1000022 /* EventIngestionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventIngestionManagerTests.swift; sourceTree = "<group>"; };
 		A1000018 /* HookInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookInstaller.swift; sourceTree = "<group>"; };
 		A1000023 /* HookInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookInstallerTests.swift; sourceTree = "<group>"; };
+		A1000024 /* SessionPanelControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPanelControllerTests.swift; sourceTree = "<group>"; };
+		A1000030 /* SessionPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPanel.swift; sourceTree = "<group>"; };
+		A1000031 /* SessionContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionContentView.swift; sourceTree = "<group>"; };
+		A1000032 /* SessionPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPanelController.swift; sourceTree = "<group>"; };
 		A1000051 /* Whippet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Whippet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000061 /* WhippetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhippetTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -82,6 +90,7 @@
 				A1000084 /* Database */,
 				A1000086 /* Hooks */,
 				A1000085 /* Ingestion */,
+				A1000087 /* Window */,
 				A1000011 /* Assets.xcassets */,
 				A1000012 /* Info.plist */,
 				A1000013 /* Whippet.entitlements */,
@@ -96,6 +105,7 @@
 				A1000021 /* DatabaseManagerTests.swift */,
 				A1000022 /* EventIngestionManagerTests.swift */,
 				A1000023 /* HookInstallerTests.swift */,
+				A1000024 /* SessionPanelControllerTests.swift */,
 			);
 			path = WhippetTests;
 			sourceTree = "<group>";
@@ -124,6 +134,16 @@
 				A1000018 /* HookInstaller.swift */,
 			);
 			path = Hooks;
+			sourceTree = "<group>";
+		};
+		A1000087 /* Window */ = {
+			isa = PBXGroup;
+			children = (
+				A1000030 /* SessionPanel.swift */,
+				A1000031 /* SessionContentView.swift */,
+				A1000032 /* SessionPanelController.swift */,
+			);
+			path = Window;
 			sourceTree = "<group>";
 		};
 		A1000083 /* Products */ = {
@@ -232,6 +252,9 @@
 				A1000007 /* EventIngestionManager.swift in Sources */,
 				A1000008 /* EventFile.swift in Sources */,
 				A100000A /* HookInstaller.swift in Sources */,
+				A100000C /* SessionPanel.swift in Sources */,
+				A100000D /* SessionContentView.swift in Sources */,
+				A100000E /* SessionPanelController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -243,6 +266,7 @@
 				A1000006 /* DatabaseManagerTests.swift in Sources */,
 				A1000009 /* EventIngestionManagerTests.swift in Sources */,
 				A100000B /* HookInstallerTests.swift in Sources */,
+				A100000F /* SessionPanelControllerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
