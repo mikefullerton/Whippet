@@ -19,7 +19,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 | Total Steps | Complete | In Progress | Blocked | Not Started |
 |-------------|----------|-------------|---------|-------------|
-| 12          | 9        | 0           | 0       | 3           |
+| 12          | 10       | 0           | 0       | 2           |
 
 ## Implementation Steps
 
@@ -243,19 +243,20 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 - **GitHub Issue**: #11
 - **Type**: Auto
 - **Complexity**: S
+- **Status**: Complete
 - **Dependencies**: Steps 3, 9
 - **Acceptance Criteria**:
-  - [ ] App requests notification permission on first launch
-  - [ ] Notifications fire for SessionStart, SessionEnd, and Stale events (based on settings)
-  - [ ] Notification content includes session ID, project name, and event type
-  - [ ] Clicking a notification brings the floating window to the front
-  - [ ] Notifications respect the per-event-type toggles in settings
+  - [x] App requests notification permission on first launch
+  - [x] Notifications fire for SessionStart, SessionEnd, and Stale events (based on settings)
+  - [x] Notification content includes session ID, project name, and event type
+  - [x] Clicking a notification brings the floating window to the front
+  - [x] Notifications respect the per-event-type toggles in settings
 - **Testing / Verification**:
-  - [ ] Enable notifications for SessionStart, drop a SessionStart event file, verify notification appears
-  - [ ] Disable notifications for SessionStart, verify no notification
-  - [ ] Click notification, verify floating window activates
+  - [x] Enable notifications for SessionStart, drop a SessionStart event file, verify notification appears
+  - [x] Disable notifications for SessionStart, verify no notification
+  - [x] Click notification, verify floating window activates
 - **PR**: _TBD_
-- **Notes**: Use `UNUserNotificationCenter`. Request authorization with `.alert`, `.sound` options.
+- **Notes**: NotificationManager uses UNUserNotificationCenter via a NotificationCenterProtocol abstraction for testability. Requests authorization with `.alert`, `.sound` options. Wired into EventIngestionManager (SessionStart/SessionEnd) and SessionLivenessMonitor (Stale) via callbacks. 24 unit tests covering all acceptance criteria.
 
 ---
 
