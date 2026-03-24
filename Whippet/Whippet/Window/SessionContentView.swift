@@ -8,14 +8,33 @@ struct SessionContentView: View {
     @ObservedObject var viewModel: SessionListViewModel
 
     var body: some View {
-        Group {
-            if viewModel.isEmpty {
-                emptyState
-            } else {
-                sessionList
+        VStack(spacing: 0) {
+            Group {
+                if viewModel.isEmpty {
+                    emptyState
+                } else {
+                    sessionList
+                }
+            }
+
+            // Error banner for failed click actions
+            if let error = viewModel.lastActionError {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.yellow)
+                    Text(error)
+                        .font(.caption)
+                        .lineLimit(2)
+                    Spacer()
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(.red.opacity(0.15))
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
         .frame(minWidth: 320, minHeight: 200)
+        .animation(.easeInOut(duration: 0.2), value: viewModel.lastActionError)
     }
 
     // MARK: - Empty State
@@ -53,7 +72,7 @@ struct SessionContentView: View {
             ScrollView {
                 LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
                     ForEach(viewModel.groups) { group in
-                        SessionGroupView(group: group)
+                        SessionGroupView(group: group, onSessionClick: viewModel.handleSessionClick)
                     }
                 }
             }
@@ -82,13 +101,14 @@ struct SessionContentView: View {
 /// A collapsible section showing sessions for a single project.
 struct SessionGroupView: View {
     let group: SessionGroup
+    var onSessionClick: ((Session) -> Void)?
     @State private var isExpanded = true
 
     var body: some View {
         Section {
             if isExpanded {
                 ForEach(group.sessions, id: \.sessionId) { session in
-                    SessionRowView(session: session)
+                    SessionRowView(session: session, onTap: onSessionClick)
                     if session.sessionId != group.sessions.last?.sessionId {
                         Divider()
                             .padding(.leading, 12)
@@ -141,6 +161,8 @@ struct SessionGroupView: View {
 /// Displays a single session with its status, metadata, and activity information.
 struct SessionRowView: View {
     let session: Session
+    var onTap: ((Session) -> Void)?
+    @State private var isHovered = false
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -192,6 +214,13 @@ struct SessionRowView: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
         .contentShape(Rectangle())
+        .background(isHovered ? Color.primary.opacity(0.05) : Color.clear)
+        .onHover { hovering in
+            isHovered = hovering
+        }
+        .onTapGesture {
+            onTap?(session)
+        }
     }
 
     // MARK: - Status Indicator

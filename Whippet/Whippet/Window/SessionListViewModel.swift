@@ -39,6 +39,12 @@ final class SessionListViewModel: ObservableObject {
     private let databaseManager: DatabaseManager
     private var refreshTimer: Timer?
 
+    /// The action handler for session click actions.
+    let actionHandler: SessionActionHandler
+
+    /// The last error message from a click action, shown briefly in the UI.
+    @Published var lastActionError: String?
+
     /// Notification name posted when new events are ingested.
     static let sessionsDidChangeNotification = Notification.Name("WhippetSessionsDidChange")
 
@@ -48,6 +54,7 @@ final class SessionListViewModel: ObservableObject {
     /// - Parameter databaseManager: The database manager to query for sessions.
     init(databaseManager: DatabaseManager) {
         self.databaseManager = databaseManager
+        self.actionHandler = SessionActionHandler(databaseManager: databaseManager)
         loadSessions()
         startListening()
     }
@@ -135,5 +142,25 @@ final class SessionListViewModel: ObservableObject {
             name: sessionsDidChangeNotification,
             object: nil
         )
+    }
+
+    // MARK: - Click Actions
+
+    /// Handles a click on a session row by executing the configured action.
+    /// - Parameter session: The session that was clicked.
+    func handleSessionClick(_ session: Session) {
+        let result = actionHandler.execute(for: session)
+        switch result {
+        case .success:
+            lastActionError = nil
+        case .failure(let error):
+            lastActionError = error.localizedDescription
+            NSLog("Whippet: Click action failed: \(error.localizedDescription)")
+
+            // Clear the error after a delay
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4) { [weak self] in
+                self?.lastActionError = nil
+            }
+        }
     }
 }
