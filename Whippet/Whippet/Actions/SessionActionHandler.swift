@@ -203,6 +203,7 @@ final class SessionActionHandler {
     }
 
     /// Runs the custom shell command with variable substitution.
+    /// Runs asynchronously on a background queue to avoid blocking the main thread.
     private func runCustomCommand(for session: Session) -> SessionActionResult {
         let template = customCommandTemplate
         let command = substituteVariables(in: template, session: session)
@@ -217,12 +218,14 @@ final class SessionActionHandler {
 
         do {
             try process.run()
-            process.waitUntilExit()
-
-            if process.terminationStatus != 0 {
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let output = String(data: data, encoding: .utf8) ?? "Unknown error"
-                return .failure(.commandFailed("Exit code \(process.terminationStatus): \(output)"))
+            // Run waitUntilExit on a background queue so we don't block the main thread
+            DispatchQueue.global(qos: .userInitiated).async {
+                process.waitUntilExit()
+                if process.terminationStatus != 0 {
+                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    let output = String(data: data, encoding: .utf8) ?? "Unknown error"
+                    NSLog("Whippet: Custom command failed (exit \(process.terminationStatus)): \(output)")
+                }
             }
             return .success
         } catch {
@@ -231,6 +234,7 @@ final class SessionActionHandler {
     }
 
     /// Sends a macOS notification with session details.
+    /// Fires asynchronously to avoid blocking the main thread.
     private func sendNotification(for session: Session) -> SessionActionResult {
         let content = UNMutableNotificationContent()
         content.title = "Whippet: \(session.projectName)"
@@ -243,38 +247,42 @@ final class SessionActionHandler {
             trigger: nil
         )
 
-        let semaphore = DispatchSemaphore(value: 0)
-        var deliveryError: Error?
-
         UNUserNotificationCenter.current().add(request) { error in
-            deliveryError = error
-            semaphore.signal()
+            if let error = error {
+                NSLog("Whippet: Notification delivery failed: \(error.localizedDescription)")
+            }
         }
 
-        semaphore.wait()
-
-        if let error = deliveryError {
-            return .failure(.notificationFailed(error.localizedDescription))
-        }
         return .success
     }
 
     // MARK: - Helpers
 
     /// Substitutes `$SESSION_ID`, `$CWD`, and `$MODEL` in a command template.
+    /// Values are shell-escaped to prevent command injection from untrusted event data.
     func substituteVariables(in template: String, session: Session) -> String {
         var result = template
-        result = result.replacingOccurrences(of: "$SESSION_ID", with: session.sessionId)
-        result = result.replacingOccurrences(of: "$CWD", with: session.cwd)
-        result = result.replacingOccurrences(of: "$MODEL", with: session.model)
+        result = result.replacingOccurrences(of: "$SESSION_ID", with: posixShellEscape(session.sessionId))
+        result = result.replacingOccurrences(of: "$CWD", with: posixShellEscape(session.cwd))
+        result = result.replacingOccurrences(of: "$MODEL", with: posixShellEscape(session.model))
         return result
     }
 
-    /// Escapes a string for safe use inside a single-quoted shell argument within AppleScript.
+    /// Escapes a string for safe use in a POSIX shell by wrapping in single quotes.
+    /// Single quotes within the string are handled by ending the quote, adding an escaped
+    /// single quote, and re-opening the single quote: 'foo'\''bar' -> foo'bar
+    private func posixShellEscape(_ string: String) -> String {
+        return "'" + string.replacingOccurrences(of: "'", with: "'\\''") + "'"
+    }
+
+    /// Escapes a string for safe use inside an AppleScript double-quoted string.
+    /// Escapes backslashes, double quotes, and strips control characters.
     private func shellEscape(_ string: String) -> String {
-        // For AppleScript's "do script" we need to escape backslashes and double quotes
-        return string
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
+        var escaped = string
+        escaped = escaped.replacingOccurrences(of: "\\", with: "\\\\")
+        escaped = escaped.replacingOccurrences(of: "\"", with: "\\\"")
+        // Remove control characters that could break out of AppleScript strings
+        escaped = escaped.filter { !$0.isNewline && $0 != "\r" && $0 != "\0" }
+        return escaped
     }
 }

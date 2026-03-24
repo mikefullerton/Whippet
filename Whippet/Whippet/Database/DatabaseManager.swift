@@ -291,8 +291,29 @@ final class DatabaseManager {
 
     /// Deletes a session and all its associated events.
     func deleteSession(sessionId: String) throws {
-        try execute("DELETE FROM events WHERE session_id = '\(sessionId)'")
-        try execute("DELETE FROM sessions WHERE session_id = '\(sessionId)'")
+        // Delete events first (foreign key dependency)
+        let deleteEventsSql = "DELETE FROM events WHERE session_id = ?"
+        var evtStmt: OpaquePointer?
+        defer { sqlite3_finalize(evtStmt) }
+        guard sqlite3_prepare_v2(db, deleteEventsSql, -1, &evtStmt, nil) == SQLITE_OK else {
+            throw DatabaseError.prepareFailed(lastErrorMessage)
+        }
+        sqlite3_bind_text(evtStmt, 1, (sessionId as NSString).utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        guard sqlite3_step(evtStmt) == SQLITE_DONE else {
+            throw DatabaseError.executionFailed(lastErrorMessage)
+        }
+
+        // Then delete the session
+        let deleteSessionSql = "DELETE FROM sessions WHERE session_id = ?"
+        var sessStmt: OpaquePointer?
+        defer { sqlite3_finalize(sessStmt) }
+        guard sqlite3_prepare_v2(db, deleteSessionSql, -1, &sessStmt, nil) == SQLITE_OK else {
+            throw DatabaseError.prepareFailed(lastErrorMessage)
+        }
+        sqlite3_bind_text(sessStmt, 1, (sessionId as NSString).utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+        guard sqlite3_step(sessStmt) == SQLITE_DONE else {
+            throw DatabaseError.executionFailed(lastErrorMessage)
+        }
     }
 
     /// Fetches active sessions that are past the given timeout (about to be marked stale).
@@ -302,7 +323,7 @@ final class DatabaseManager {
             SELECT id, session_id, cwd, model, started_at, last_activity_at, last_tool, status
             FROM sessions
             WHERE status = 'active'
-            AND datetime(last_activity_at, '+\(Int(seconds)) seconds') < datetime('now')
+            AND datetime(last_activity_at, '+' || ? || ' seconds') < datetime('now')
         """
 
         var stmt: OpaquePointer?
@@ -311,6 +332,9 @@ final class DatabaseManager {
         guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
             throw DatabaseError.prepareFailed(lastErrorMessage)
         }
+
+        let secondsStr = String(max(0, Int(seconds)))
+        sqlite3_bind_text(stmt, 1, (secondsStr as NSString).utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
 
         var sessions: [Session] = []
         while sqlite3_step(stmt) == SQLITE_ROW {
@@ -324,9 +348,22 @@ final class DatabaseManager {
         let sql = """
             UPDATE sessions SET status = 'stale'
             WHERE status = 'active'
-            AND datetime(last_activity_at, '+\(Int(seconds)) seconds') < datetime('now')
+            AND datetime(last_activity_at, '+' || ? || ' seconds') < datetime('now')
         """
-        try execute(sql)
+
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.prepareFailed(lastErrorMessage)
+        }
+
+        let secondsStr = String(max(0, Int(seconds)))
+        sqlite3_bind_text(stmt, 1, (secondsStr as NSString).utf8String, -1, unsafeBitCast(-1, to: sqlite3_destructor_type.self))
+
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw DatabaseError.executionFailed(lastErrorMessage)
+        }
         return Int(sqlite3_changes(db))
     }
 
@@ -559,6 +596,10 @@ final class DatabaseManager {
 
     /// Returns column info for a given table.
     func columnInfo(forTable table: String) throws -> [(name: String, type: String, notNull: Bool)] {
+        // Validate table name: only allow alphanumeric and underscore to prevent injection
+        guard table.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" }) else {
+            throw DatabaseError.prepareFailed("Invalid table name: \(table)")
+        }
         let sql = "PRAGMA table_info(\(table))"
 
         var stmt: OpaquePointer?
