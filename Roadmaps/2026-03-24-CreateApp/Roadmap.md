@@ -19,7 +19,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 | Total Steps | Complete | In Progress | Blocked | Not Started |
 |-------------|----------|-------------|---------|-------------|
-| 12          | 5        | 0           | 0       | 7           |
+| 12          | 6        | 0           | 0       | 6           |
 
 ## Implementation Steps
 
@@ -147,22 +147,23 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 - **GitHub Issue**: #7
 - **Type**: Auto
 - **Complexity**: M
+- **Status**: Complete
 - **Dependencies**: Steps 2, 3, 5
 - **Acceptance Criteria**:
-  - [ ] SwiftUI view displays sessions from SQLite database
-  - [ ] Sessions are grouped by repository/project (derived from working directory)
-  - [ ] Each session row shows: working directory, model, time started, last activity, last tool used, status
-  - [ ] Active sessions have a visual indicator distinct from stale and ended sessions
-  - [ ] List updates in real time as new events are ingested
-  - [ ] Empty state shown when no sessions exist
-  - [ ] Groups are collapsible
+  - [x] SwiftUI view displays sessions from SQLite database
+  - [x] Sessions are grouped by repository/project (derived from working directory)
+  - [x] Each session row shows: working directory, model, time started, last activity, last tool used, status
+  - [x] Active sessions have a visual indicator distinct from stale and ended sessions
+  - [x] List updates in real time as new events are ingested
+  - [x] Empty state shown when no sessions exist
+  - [x] Groups are collapsible
 - **Testing / Verification**:
-  - [ ] Insert test session data into database, verify UI renders correctly
-  - [ ] Drop event files, verify list updates without manual refresh
-  - [ ] Verify grouping logic with sessions from multiple projects
-  - [ ] Verify visual distinction between active/stale/ended sessions
+  - [x] Insert test session data into database, verify UI renders correctly
+  - [x] Drop event files, verify list updates without manual refresh
+  - [x] Verify grouping logic with sessions from multiple projects
+  - [x] Verify visual distinction between active/stale/ended sessions
 - **PR**: _TBD_
-- **Notes**: Use `@Observable` or `ObservableObject` pattern to bridge SQLite data to SwiftUI. Consider a lightweight publish/subscribe model from the ingestion layer.
+- **Notes**: SessionListViewModel uses ObservableObject with NotificationCenter-based updates. EventIngestionManager posts notifications after processing files. SessionContentView has collapsible SessionGroupView sections with SessionRowView showing status indicators (green circle=active, orange circle=stale, hollow circle=ended). Groups with active sessions sort first. 15 unit tests for the view model.
 
 ---
 
