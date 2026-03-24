@@ -6,12 +6,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem!
     private var databaseManager: DatabaseManager?
     private var ingestionManager: EventIngestionManager?
+    private var hookInstaller: HookInstaller?
 
     // MARK: - App Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
         setupDatabase()
+        installHooksIfNeeded()
         setupIngestion()
     }
 
@@ -27,6 +29,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             NSLog("Whippet: Database initialized")
         } catch {
             NSLog("Whippet: Failed to initialize database: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Hooks
+
+    private func installHooksIfNeeded() {
+        hookInstaller = HookInstaller()
+        let result = hookInstaller?.installHooks() ?? .failed("HookInstaller not created")
+        switch result {
+        case .installed:
+            NSLog("Whippet: Hooks installed successfully")
+        case .alreadyInstalled:
+            NSLog("Whippet: Hooks already installed, skipping")
+        case .failed(let error):
+            NSLog("Whippet: Hook installation failed: \(error)")
         }
     }
 
