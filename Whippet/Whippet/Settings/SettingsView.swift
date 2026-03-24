@@ -13,9 +13,10 @@ struct SettingsView: View {
             windowSection
             notificationsSection
             actionsSection
+            launchAtLoginSection
         }
         .formStyle(.grouped)
-        .frame(minWidth: 420, minHeight: 400)
+        .frame(minWidth: 420, minHeight: 460)
     }
 
     // MARK: - General Section
@@ -115,6 +116,36 @@ struct SettingsView: View {
             }
         } header: {
             Label("Actions", systemImage: "cursorarrow.click")
+        }
+    }
+
+    // MARK: - Launch at Login Section
+
+    private var launchAtLoginSection: some View {
+        Section {
+            Toggle("Launch at Login", isOn: $viewModel.launchAtLogin)
+
+            if viewModel.shouldShowLaunchAtLoginPrompt {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Whippet works best when it starts automatically with your Mac. Enable launch at login so you never miss a Claude Code session.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Button("Got It") {
+                        viewModel.dismissLaunchAtLoginPrompt()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                }
+                .padding(.vertical, 4)
+            }
+
+            Text("Requires the app to be in /Applications or have a valid bundle identifier.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        } header: {
+            Label("Startup", systemImage: "power")
         }
     }
 }

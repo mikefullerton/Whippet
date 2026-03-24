@@ -11,6 +11,12 @@ final class SettingsViewModel: ObservableObject {
     /// Key for the staleness timeout (seconds), also used by SessionLivenessMonitor.
     static let stalenessTimeoutKey = "staleness_timeout"
 
+    /// Key for the launch-at-login setting.
+    static let launchAtLoginKey = LaunchAtLoginManager.launchAtLoginKey
+
+    /// Key for tracking whether the first-launch prompt has been shown.
+    static let launchAtLoginPromptShownKey = LaunchAtLoginManager.launchAtLoginPromptShownKey
+
     /// Key for the always-on-top toggle.
     static let alwaysOnTopKey = "always_on_top"
 
@@ -42,6 +48,7 @@ final class SettingsViewModel: ObservableObject {
     static let defaultNotifyStale: Bool = false
     static let defaultClickAction: SessionClickAction = .openTerminal
     static let defaultCustomCommand: String = "echo $SESSION_ID $CWD $MODEL"
+    static let defaultLaunchAtLogin: Bool = false
 
     // MARK: - Published Properties
 
@@ -93,6 +100,29 @@ final class SettingsViewModel: ObservableObject {
         didSet { saveSetting(key: Self.customCommandKey, value: customCommand) }
     }
 
+    /// Whether the app is registered to launch at login. Reads the actual system
+    /// state from SMAppService and toggles it via LaunchAtLoginManager.
+    @Published var launchAtLogin: Bool {
+        didSet {
+            guard let manager = launchAtLoginManager else { return }
+            // Only call setEnabled when the toggle actually differs from system state
+            guard launchAtLogin != manager.isEnabled else { return }
+            do {
+                try manager.setEnabled(launchAtLogin)
+            } catch {
+                NSLog("Whippet: Failed to \(launchAtLogin ? "enable" : "disable") launch at login: \(error.localizedDescription)")
+                // Revert to actual state on failure (suppress re-trigger of didSet)
+                let actual = manager.isEnabled
+                if actual != launchAtLogin {
+                    launchAtLogin = actual
+                }
+            }
+        }
+    }
+
+    /// Whether to show the first-launch prompt explaining launch-at-login.
+    @Published var shouldShowLaunchAtLoginPrompt: Bool = false
+
     // MARK: - Callbacks
 
     /// Called when the always-on-top setting changes so the panel controller can update.
@@ -105,12 +135,18 @@ final class SettingsViewModel: ObservableObject {
 
     private let databaseManager: DatabaseManager
 
+    /// The launch-at-login manager. Nil until configured via `configureLaunchAtLogin`.
+    private(set) var launchAtLoginManager: LaunchAtLoginManager?
+
     // MARK: - Initialization
 
     /// Creates a SettingsViewModel that reads initial values from the database.
-    /// - Parameter databaseManager: The database manager for persisting settings.
-    init(databaseManager: DatabaseManager) {
+    /// - Parameters:
+    ///   - databaseManager: The database manager for persisting settings.
+    ///   - launchAtLoginManager: Optional manager for launch-at-login functionality.
+    init(databaseManager: DatabaseManager, launchAtLoginManager: LaunchAtLoginManager? = nil) {
         self.databaseManager = databaseManager
+        self.launchAtLoginManager = launchAtLoginManager
 
         // Load initial values from database (use defaults if not set)
         self.stalenessTimeout = Self.defaultStalenessTimeout
@@ -121,8 +157,19 @@ final class SettingsViewModel: ObservableObject {
         self.notifyStale = Self.defaultNotifyStale
         self.clickAction = Self.defaultClickAction
         self.customCommand = Self.defaultCustomCommand
+        self.launchAtLogin = Self.defaultLaunchAtLogin
 
         loadFromDatabase()
+    }
+
+    /// Configures the launch-at-login manager after initialization.
+    /// Call this to enable the launch-at-login toggle in settings.
+    func configureLaunchAtLogin(_ manager: LaunchAtLoginManager) {
+        self.launchAtLoginManager = manager
+        // Sync the toggle with the actual system state
+        self.launchAtLogin = manager.isEnabled
+        // Check if we should show the first-launch prompt
+        self.shouldShowLaunchAtLoginPrompt = !manager.hasShownPrompt
     }
 
     // MARK: - Load
@@ -163,6 +210,12 @@ final class SettingsViewModel: ObservableObject {
             if let value = settings[Self.customCommandKey], !value.isEmpty {
                 customCommand = value
             }
+
+            // Launch at login reads the actual system state, not the database
+            if let manager = launchAtLoginManager {
+                launchAtLogin = manager.isEnabled
+                shouldShowLaunchAtLoginPrompt = !manager.hasShownPrompt
+            }
         } catch {
             NSLog("Whippet: Failed to load settings: \(error.localizedDescription)")
         }
@@ -177,6 +230,14 @@ final class SettingsViewModel: ObservableObject {
         } catch {
             NSLog("Whippet: Failed to save setting '\(key)': \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Launch at Login Prompt
+
+    /// Dismisses the first-launch prompt and marks it as shown.
+    func dismissLaunchAtLoginPrompt() {
+        shouldShowLaunchAtLoginPrompt = false
+        launchAtLoginManager?.markPromptShown()
     }
 
     // MARK: - Formatted Display

@@ -47,7 +47,8 @@ final class SettingsWindowController {
             return
         }
 
-        let vm = SettingsViewModel(databaseManager: databaseManager)
+        let launchAtLoginManager = LaunchAtLoginManager(databaseManager: databaseManager)
+        let vm = SettingsViewModel(databaseManager: databaseManager, launchAtLoginManager: launchAtLoginManager)
 
         // Wire up callbacks so changes take effect immediately on the session panel
         vm.onAlwaysOnTopChanged = { [weak self] isFloating in
