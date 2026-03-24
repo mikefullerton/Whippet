@@ -19,7 +19,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 | Total Steps | Complete | In Progress | Blocked | Not Started |
 |-------------|----------|-------------|---------|-------------|
-| 12          | 4        | 0           | 0       | 8           |
+| 12          | 5        | 0           | 0       | 7           |
 
 ## Implementation Steps
 
@@ -122,22 +122,23 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 - **GitHub Issue**: #6
 - **Type**: Auto
 - **Complexity**: M
+- **Status**: Complete
 - **Dependencies**: Step 1
 - **Acceptance Criteria**:
-  - [ ] NSPanel created with `.floating` window level (default)
-  - [ ] Window level is configurable (floating vs normal)
-  - [ ] Window has configurable transparency (alpha value)
-  - [ ] SwiftUI content hosted via NSHostingController
-  - [ ] Panel toggles visibility from the menu bar "Show Sessions" item
-  - [ ] Panel remembers its position between toggles
-  - [ ] Panel has a clean, minimal chrome appropriate for a utility window
+  - [x] NSPanel created with `.floating` window level (default)
+  - [x] Window level is configurable (floating vs normal)
+  - [x] Window has configurable transparency (alpha value)
+  - [x] SwiftUI content hosted via NSHostingController
+  - [x] Panel toggles visibility from the menu bar "Show Sessions" item
+  - [x] Panel remembers its position between toggles
+  - [x] Panel has a clean, minimal chrome appropriate for a utility window
 - **Testing / Verification**:
-  - [ ] Launch app, toggle panel from menu bar — appears and disappears
-  - [ ] Verify panel floats above other windows when set to floating
-  - [ ] Verify transparency is adjustable
-  - [ ] Move panel, hide, show — verify position is remembered
+  - [x] Launch app, toggle panel from menu bar — appears and disappears
+  - [x] Verify panel floats above other windows when set to floating
+  - [x] Verify transparency is adjustable
+  - [x] Move panel, hide, show — verify position is remembered
 - **PR**: _TBD_
-- **Notes**: NSPanel with `styleMask` including `.utilityWindow` and `.nonactivatingPanel` for proper floating behavior.
+- **Notes**: SessionPanel (NSPanel subclass) with `.utilityWindow` and `.nonactivatingPanel` style masks. SessionPanelController manages lazy creation, visibility toggle, position persistence via savedOrigin and frame autosave, and configurable floating/normal level and transparency (clamped 0.3-1.0). SwiftUI placeholder content via NSHostingController. 28 unit tests covering all acceptance criteria.
 
 ---
 
