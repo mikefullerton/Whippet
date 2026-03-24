@@ -4,10 +4,18 @@ import XCTest
 final class SessionPanelControllerTests: XCTestCase {
 
     private var controller: SessionPanelController!
+    private var tempDatabasePath: String!
+    private var databaseManager: DatabaseManager!
 
     override func setUp() {
         super.setUp()
+
+        // Create a temp database so the panel controller can create its view model
+        tempDatabasePath = NSTemporaryDirectory() + "whippet_test_panel_\(UUID().uuidString).db"
+        databaseManager = try! DatabaseManager(path: tempDatabasePath)
+
         controller = SessionPanelController()
+        controller.setDatabaseManager(databaseManager)
 
         // Clear any saved frame from previous test runs
         let key = "NSWindow Frame \(SessionPanelController.frameAutosaveName)"
@@ -18,6 +26,9 @@ final class SessionPanelControllerTests: XCTestCase {
         // Ensure panel is hidden and cleaned up
         controller.hidePanel()
         controller = nil
+
+        databaseManager.close()
+        try? FileManager.default.removeItem(atPath: tempDatabasePath)
 
         let key = "NSWindow Frame \(SessionPanelController.frameAutosaveName)"
         UserDefaults.standard.removeObject(forKey: key)
@@ -282,5 +293,27 @@ final class SessionPanelControllerTests: XCTestCase {
         }
         XCTAssertTrue(panel.collectionBehavior.contains(.fullScreenAuxiliary),
                        "Panel should be full screen auxiliary")
+    }
+
+    // MARK: - View Model
+
+    func testViewModelIsCreatedWhenDatabaseManagerIsSet() {
+        XCTAssertNotNil(controller.viewModel, "View model should be created after setDatabaseManager")
+    }
+
+    func testShowPanelRefreshesSessionData() throws {
+        // Insert a session into the database
+        try databaseManager.upsertSession(Session(
+            sessionId: "test-session",
+            cwd: "/Users/test/projects/TestProject",
+            model: "claude-3.5-sonnet",
+            status: .active
+        ))
+
+        // Show the panel - this should trigger loadSessions on the view model
+        controller.showPanel()
+
+        XCTAssertNotNil(controller.viewModel)
+        XCTAssertFalse(controller.viewModel?.isEmpty ?? true, "View model should have loaded session data")
     }
 }

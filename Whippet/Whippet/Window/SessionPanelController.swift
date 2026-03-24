@@ -8,6 +8,7 @@ import SwiftUI
 /// - Toggles panel visibility from the menu bar
 /// - Remembers panel position between show/hide cycles
 /// - Exposes window level and transparency configuration
+/// - Hosts the SessionListViewModel that drives the session list UI
 final class SessionPanelController {
 
     // MARK: - Properties
@@ -15,15 +16,30 @@ final class SessionPanelController {
     /// The underlying NSPanel instance.
     private(set) var panel: SessionPanel?
 
+    /// The view model that drives the session list. Created when the database manager is set.
+    private(set) var viewModel: SessionListViewModel?
+
     /// The last saved frame origin, used to restore position between toggles.
     private var savedOrigin: NSPoint?
 
     /// Key used to persist the panel frame in UserDefaults.
     static let frameAutosaveName = "WhippetSessionPanel"
 
+    /// The database manager used to create the view model.
+    private var databaseManager: DatabaseManager?
+
     // MARK: - Initialization
 
     init() {}
+
+    // MARK: - Configuration
+
+    /// Sets the database manager and creates the view model.
+    /// Must be called before the panel is shown for session data to appear.
+    func setDatabaseManager(_ databaseManager: DatabaseManager) {
+        self.databaseManager = databaseManager
+        self.viewModel = SessionListViewModel(databaseManager: databaseManager)
+    }
 
     // MARK: - Panel Creation
 
@@ -36,8 +52,14 @@ final class SessionPanelController {
         let defaultFrame = NSRect(x: 0, y: 0, width: 400, height: 500)
         let sessionPanel = SessionPanel(contentRect: defaultFrame)
 
-        // Host the SwiftUI content
-        let hostingController = NSHostingController(rootView: SessionContentView())
+        // Host the SwiftUI content with the view model
+        guard let viewModel = viewModel else {
+            NSLog("Whippet: Warning - SessionPanelController creating panel without database manager; call setDatabaseManager first")
+            return
+        }
+        let contentView = SessionContentView(viewModel: viewModel)
+
+        let hostingController = NSHostingController(rootView: contentView)
         sessionPanel.contentView = hostingController.view
 
         // Restore saved frame or center the panel
@@ -83,6 +105,9 @@ final class SessionPanelController {
         if let origin = savedOrigin {
             panel.setFrameOrigin(origin)
         }
+
+        // Refresh session data when showing
+        viewModel?.loadSessions()
 
         panel.orderFront(nil)
     }

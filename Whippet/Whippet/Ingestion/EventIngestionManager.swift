@@ -168,6 +168,7 @@ final class EventIngestionManager {
 
         if !jsonFiles.isEmpty {
             onEventsIngested?()
+            SessionListViewModel.notifySessionsChanged()
         }
     }
 

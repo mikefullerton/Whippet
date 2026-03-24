@@ -14,6 +14,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
         setupDatabase()
+        setupPanelController()
         installHooksIfNeeded()
         setupIngestion()
     }
@@ -31,6 +32,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             NSLog("Whippet: Failed to initialize database: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Panel Controller
+
+    private func setupPanelController() {
+        guard let db = databaseManager else {
+            NSLog("Whippet: Cannot setup panel controller without database")
+            return
+        }
+        panelController.setDatabaseManager(db)
     }
 
     // MARK: - Hooks

@@ -22,6 +22,8 @@
 		A100000D /* SessionContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000031 /* SessionContentView.swift */; };
 		A100000E /* SessionPanelController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000032 /* SessionPanelController.swift */; };
 		A100000F /* SessionPanelControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000024 /* SessionPanelControllerTests.swift */; };
+		A1000100 /* SessionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000033 /* SessionListViewModel.swift */; };
+		A1000101 /* SessionListViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000025 /* SessionListViewModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,9 +51,11 @@
 		A1000018 /* HookInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookInstaller.swift; sourceTree = "<group>"; };
 		A1000023 /* HookInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookInstallerTests.swift; sourceTree = "<group>"; };
 		A1000024 /* SessionPanelControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPanelControllerTests.swift; sourceTree = "<group>"; };
+		A1000025 /* SessionListViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListViewModelTests.swift; sourceTree = "<group>"; };
 		A1000030 /* SessionPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPanel.swift; sourceTree = "<group>"; };
 		A1000031 /* SessionContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionContentView.swift; sourceTree = "<group>"; };
 		A1000032 /* SessionPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPanelController.swift; sourceTree = "<group>"; };
+		A1000033 /* SessionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListViewModel.swift; sourceTree = "<group>"; };
 		A1000051 /* Whippet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Whippet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000061 /* WhippetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhippetTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -106,6 +110,7 @@
 				A1000022 /* EventIngestionManagerTests.swift */,
 				A1000023 /* HookInstallerTests.swift */,
 				A1000024 /* SessionPanelControllerTests.swift */,
+				A1000025 /* SessionListViewModelTests.swift */,
 			);
 			path = WhippetTests;
 			sourceTree = "<group>";
@@ -142,6 +147,7 @@
 				A1000030 /* SessionPanel.swift */,
 				A1000031 /* SessionContentView.swift */,
 				A1000032 /* SessionPanelController.swift */,
+				A1000033 /* SessionListViewModel.swift */,
 			);
 			path = Window;
 			sourceTree = "<group>";
@@ -255,6 +261,7 @@
 				A100000C /* SessionPanel.swift in Sources */,
 				A100000D /* SessionContentView.swift in Sources */,
 				A100000E /* SessionPanelController.swift in Sources */,
+				A1000100 /* SessionListViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -267,6 +274,7 @@
 				A1000009 /* EventIngestionManagerTests.swift in Sources */,
 				A100000B /* HookInstallerTests.swift in Sources */,
 				A100000F /* SessionPanelControllerTests.swift in Sources */,
+				A1000101 /* SessionListViewModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
