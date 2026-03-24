@@ -19,7 +19,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 | Total Steps | Complete | In Progress | Blocked | Not Started |
 |-------------|----------|-------------|---------|-------------|
-| 12          | 3        | 0           | 0       | 9           |
+| 12          | 4        | 0           | 0       | 8           |
 
 ## Implementation Steps
 
@@ -98,21 +98,22 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 - **GitHub Issue**: #5
 - **Type**: Auto
 - **Complexity**: M
+- **Status**: Complete
 - **Dependencies**: Step 3
 - **Acceptance Criteria**:
-  - [ ] On first launch, app reads `~/.claude/settings.json` (or creates it if missing)
-  - [ ] Installs hooks for: SessionStart, SessionEnd, UserPromptSubmit, PreToolUse, PostToolUse, Stop, SubagentStart, SubagentStop, Notification
-  - [ ] Each hook writes a JSON file to `~/.claude/session-events/` with event type, session ID, timestamp, and relevant payload
-  - [ ] Existing hooks in `settings.json` are preserved (merge, not overwrite)
-  - [ ] App detects if its hooks are already installed and skips re-installation
-  - [ ] Hook commands use portable shell syntax (no bash-specific features)
+  - [x] On first launch, app reads `~/.claude/settings.json` (or creates it if missing)
+  - [x] Installs hooks for: SessionStart, SessionEnd, UserPromptSubmit, PreToolUse, PostToolUse, Stop, SubagentStart, SubagentStop, Notification
+  - [x] Each hook writes a JSON file to `~/.claude/session-events/` with event type, session ID, timestamp, and relevant payload
+  - [x] Existing hooks in `settings.json` are preserved (merge, not overwrite)
+  - [x] App detects if its hooks are already installed and skips re-installation
+  - [x] Hook commands use portable shell syntax (no bash-specific features)
 - **Testing / Verification**:
-  - [ ] Test with empty `settings.json` — hooks are installed correctly
-  - [ ] Test with existing hooks — Whippet hooks are appended, existing hooks untouched
-  - [ ] Test with Whippet hooks already present — no duplicates created
-  - [ ] Verify generated hook commands produce valid JSON files
+  - [x] Test with empty `settings.json` — hooks are installed correctly
+  - [x] Test with existing hooks — Whippet hooks are appended, existing hooks untouched
+  - [x] Test with Whippet hooks already present — no duplicates created
+  - [x] Verify generated hook commands produce valid JSON files
 - **PR**: _TBD_
-- **Notes**: Hook commands will use `printf` or a small helper to write JSON. Each command must include the event type, session_id, timestamp, and event-specific fields from stdin via `jq`.
+- **Notes**: HookInstaller uses a `# whippet-hook` marker comment in each command to identify Whippet hooks for detection and uninstallation. Each hook command reads the Claude Code JSON payload from stdin, pipes it through `jq` to extract event-specific fields, and writes a JSON file to the drop directory. Supports uninstallation to cleanly remove hooks. 29 unit tests covering all scenarios.
 
 ---
 
