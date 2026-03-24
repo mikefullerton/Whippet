@@ -29,6 +29,10 @@
 		A1000104 /* SessionClickAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000035 /* SessionClickAction.swift */; };
 		A1000105 /* SessionActionHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000036 /* SessionActionHandler.swift */; };
 		A1000106 /* SessionActionHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000027 /* SessionActionHandlerTests.swift */; };
+		A1000107 /* SettingsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000037 /* SettingsViewModel.swift */; };
+		A1000108 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000038 /* SettingsView.swift */; };
+		A1000109 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000039 /* SettingsWindowController.swift */; };
+		A100010A /* SettingsViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000028 /* SettingsViewModelTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -66,6 +70,10 @@
 		A1000027 /* SessionActionHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionActionHandlerTests.swift; sourceTree = "<group>"; };
 		A1000035 /* SessionClickAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionClickAction.swift; sourceTree = "<group>"; };
 		A1000036 /* SessionActionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionActionHandler.swift; sourceTree = "<group>"; };
+		A1000037 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
+		A1000038 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		A1000039 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		A1000028 /* SettingsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModelTests.swift; sourceTree = "<group>"; };
 		A1000051 /* Whippet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Whippet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000061 /* WhippetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhippetTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -105,6 +113,7 @@
 				A1000084 /* Database */,
 				A1000086 /* Hooks */,
 				A1000085 /* Ingestion */,
+				A1000089 /* Settings */,
 				A1000087 /* Window */,
 				A1000011 /* Assets.xcassets */,
 				A1000012 /* Info.plist */,
@@ -124,6 +133,7 @@
 				A1000025 /* SessionListViewModelTests.swift */,
 				A1000026 /* SessionLivenessMonitorTests.swift */,
 				A1000027 /* SessionActionHandlerTests.swift */,
+				A1000028 /* SettingsViewModelTests.swift */,
 			);
 			path = WhippetTests;
 			sourceTree = "<group>";
@@ -162,6 +172,16 @@
 				A1000036 /* SessionActionHandler.swift */,
 			);
 			path = Actions;
+			sourceTree = "<group>";
+		};
+		A1000089 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				A1000037 /* SettingsViewModel.swift */,
+				A1000038 /* SettingsView.swift */,
+				A1000039 /* SettingsWindowController.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 		A1000087 /* Window */ = {
@@ -288,6 +308,9 @@
 				A1000102 /* SessionLivenessMonitor.swift in Sources */,
 				A1000104 /* SessionClickAction.swift in Sources */,
 				A1000105 /* SessionActionHandler.swift in Sources */,
+				A1000107 /* SettingsViewModel.swift in Sources */,
+				A1000108 /* SettingsView.swift in Sources */,
+				A1000109 /* SettingsWindowController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -303,6 +326,7 @@
 				A1000101 /* SessionListViewModelTests.swift in Sources */,
 				A1000103 /* SessionLivenessMonitorTests.swift in Sources */,
 				A1000106 /* SessionActionHandlerTests.swift in Sources */,
+				A100010A /* SettingsViewModelTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -9,6 +9,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hookInstaller: HookInstaller?
     private var livenessMonitor: SessionLivenessMonitor?
     private(set) var panelController = SessionPanelController()
+    private(set) var settingsController = SettingsWindowController()
 
     // MARK: - App Lifecycle
 
@@ -16,6 +17,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenuBar()
         setupDatabase()
         setupPanelController()
+        setupSettingsController()
         installHooksIfNeeded()
         setupIngestion()
         setupLivenessMonitor()
@@ -45,6 +47,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         panelController.setDatabaseManager(db)
+    }
+
+    // MARK: - Settings Controller
+
+    private func setupSettingsController() {
+        guard let db = databaseManager else {
+            NSLog("Whippet: Cannot setup settings controller without database")
+            return
+        }
+        settingsController.configure(databaseManager: db, panelController: panelController)
     }
 
     // MARK: - Hooks
@@ -124,8 +136,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openSettings() {
-        // Placeholder: will open settings window in a later step
-        NSLog("Whippet: Settings selected")
+        settingsController.showSettings()
     }
 
     @objc private func quitApp() {
