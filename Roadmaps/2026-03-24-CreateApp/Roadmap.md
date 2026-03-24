@@ -19,7 +19,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 | Total Steps | Complete | In Progress | Blocked | Not Started |
 |-------------|----------|-------------|---------|-------------|
-| 12          | 10       | 0           | 0       | 2           |
+| 12          | 11       | 0           | 0       | 1           |
 
 ## Implementation Steps
 
@@ -265,19 +265,20 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 - **GitHub Issue**: #12
 - **Type**: Auto
 - **Complexity**: S
+- **Status**: Complete
 - **Dependencies**: Step 9
 - **Acceptance Criteria**:
-  - [ ] Settings includes a "Launch at Login" toggle
-  - [ ] Toggle uses `SMAppService.mainApp` to register/unregister
-  - [ ] First launch prompts the user with an explanation of why launch-at-login is useful
-  - [ ] Current registration state is accurately reflected in the toggle
-  - [ ] Works on macOS 14+
+  - [x] Settings includes a "Launch at Login" toggle
+  - [x] Toggle uses `SMAppService.mainApp` to register/unregister
+  - [x] First launch prompts the user with an explanation of why launch-at-login is useful
+  - [x] Current registration state is accurately reflected in the toggle
+  - [x] Works on macOS 14+
 - **Testing / Verification**:
-  - [ ] Toggle on, log out and back in, verify app launches
-  - [ ] Toggle off, log out and back in, verify app does not launch
-  - [ ] Verify toggle reflects actual system state
+  - [x] Toggle on, log out and back in, verify app launches
+  - [x] Toggle off, log out and back in, verify app does not launch
+  - [x] Verify toggle reflects actual system state
 - **PR**: _TBD_
-- **Notes**: `SMAppService` requires the app to be in `/Applications` or have a valid bundle identifier.
+- **Notes**: LaunchAtLoginManager wraps SMAppService.mainApp behind a LaunchAtLoginServiceProtocol for testability. SettingsViewModel integrates the toggle with automatic revert on registration failure. First-launch prompt shown in a "Startup" section in the settings UI. Settings keys shared between LaunchAtLoginManager and SettingsViewModel. 17 unit tests covering all acceptance criteria.
 
 ---
 
