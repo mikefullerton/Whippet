@@ -295,6 +295,30 @@ final class DatabaseManager {
         try execute("DELETE FROM sessions WHERE session_id = '\(sessionId)'")
     }
 
+    /// Fetches active sessions that are past the given timeout (about to be marked stale).
+    /// Used by the liveness monitor to know which sessions will transition to stale.
+    func fetchActiveSessionsPastTimeout(_ seconds: TimeInterval) throws -> [Session] {
+        let sql = """
+            SELECT id, session_id, cwd, model, started_at, last_activity_at, last_tool, status
+            FROM sessions
+            WHERE status = 'active'
+            AND datetime(last_activity_at, '+\(Int(seconds)) seconds') < datetime('now')
+        """
+
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.prepareFailed(lastErrorMessage)
+        }
+
+        var sessions: [Session] = []
+        while sqlite3_step(stmt) == SQLITE_ROW {
+            sessions.append(sessionFromRow(stmt))
+        }
+        return sessions
+    }
+
     /// Marks sessions as stale if they have no activity within the given timeout interval.
     func markStaleSessions(olderThan seconds: TimeInterval) throws -> Int {
         let sql = """

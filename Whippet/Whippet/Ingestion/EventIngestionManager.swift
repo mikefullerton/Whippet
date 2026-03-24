@@ -37,6 +37,10 @@ final class EventIngestionManager {
     /// Callback invoked when events are ingested (useful for UI updates).
     var onEventsIngested: (() -> Void)?
 
+    /// Callback invoked for each individual event after ingestion, providing the event type,
+    /// session ID, and project name. Used by NotificationManager to fire per-event notifications.
+    var onEventIngested: ((_ eventType: String, _ sessionId: String, _ projectName: String) -> Void)?
+
     /// Minimum file age (in seconds) before attempting to read it.
     /// This handles the case where a file is still being written.
     static let minimumFileAge: TimeInterval = 0.1
@@ -269,6 +273,10 @@ final class EventIngestionManager {
                 status: .ended
             )
         }
+
+        // Notify per-event callback (used for notifications)
+        let projectName = session.projectName
+        onEventIngested?(eventFile.event, eventFile.sessionId, projectName)
     }
 
     /// Creates a Session model from an event file's data.

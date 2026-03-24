@@ -34,6 +34,10 @@ final class SessionLivenessMonitor {
     /// Callback invoked when sessions are marked stale. Called on the liveness queue.
     var onSessionsMarkedStale: ((Int) -> Void)?
 
+    /// Callback invoked for each session that was just marked stale, providing session ID
+    /// and project name. Used by NotificationManager to fire per-session stale notifications.
+    var onSessionMarkedStale: ((_ sessionId: String, _ projectName: String) -> Void)?
+
     // MARK: - Initialization
 
     /// Creates a liveness monitor that uses the given database manager.
@@ -96,10 +100,19 @@ final class SessionLivenessMonitor {
         let timeout = currentTimeout()
 
         do {
+            // Capture sessions that are about to go stale (for per-session callbacks)
+            let aboutToGoStale = try databaseManager.fetchActiveSessionsPastTimeout(timeout)
+
             let count = try databaseManager.markStaleSessions(olderThan: timeout)
             if count > 0 {
                 NSLog("Whippet: Marked \(count) session(s) as stale (timeout: \(timeout)s)")
                 onSessionsMarkedStale?(count)
+
+                // Notify per-session callback for notifications
+                for session in aboutToGoStale {
+                    onSessionMarkedStale?(session.sessionId, session.projectName)
+                }
+
                 DispatchQueue.main.async {
                     SessionListViewModel.notifySessionsChanged()
                 }

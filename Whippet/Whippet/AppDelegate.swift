@@ -8,6 +8,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var ingestionManager: EventIngestionManager?
     private var hookInstaller: HookInstaller?
     private var livenessMonitor: SessionLivenessMonitor?
+    private var notificationManager: NotificationManager?
     private(set) var panelController = SessionPanelController()
     private(set) var settingsController = SettingsWindowController()
 
@@ -19,6 +20,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupPanelController()
         setupSettingsController()
         installHooksIfNeeded()
+        setupNotifications()
         setupIngestion()
         setupLivenessMonitor()
     }
@@ -74,6 +76,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    // MARK: - Notifications
+
+    private func setupNotifications() {
+        guard let db = databaseManager else {
+            NSLog("Whippet: Cannot setup notifications without database")
+            return
+        }
+
+        notificationManager = NotificationManager(databaseManager: db)
+        notificationManager?.requestAuthorization()
+
+        // When a notification is clicked, bring the floating window to the front
+        notificationManager?.onNotificationClicked = { [weak self] in
+            self?.panelController.showPanel()
+        }
+    }
+
     // MARK: - Ingestion
 
     private func setupIngestion() {
@@ -83,6 +102,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         ingestionManager = EventIngestionManager(databaseManager: db)
+
+        // Wire per-event callback for notifications
+        ingestionManager?.onEventIngested = { [weak self] eventType, sessionId, projectName in
+            guard let nm = self?.notificationManager else { return }
+            switch eventType {
+            case "SessionStart":
+                nm.notifySessionStart(sessionId: sessionId, projectName: projectName)
+            case "SessionEnd":
+                nm.notifySessionEnd(sessionId: sessionId, projectName: projectName)
+            default:
+                break
+            }
+        }
+
         do {
             try ingestionManager?.start()
         } catch {
@@ -99,6 +132,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         livenessMonitor = SessionLivenessMonitor(databaseManager: db)
+
+        // Wire per-session stale callback for notifications
+        livenessMonitor?.onSessionMarkedStale = { [weak self] sessionId, projectName in
+            self?.notificationManager?.notifySessionStale(sessionId: sessionId, projectName: projectName)
+        }
+
         livenessMonitor?.start()
     }
 
