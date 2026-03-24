@@ -19,7 +19,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 | Total Steps | Complete | In Progress | Blocked | Not Started |
 |-------------|----------|-------------|---------|-------------|
-| 12          | 1        | 0           | 0       | 11          |
+| 12          | 2        | 0           | 0       | 10          |
 
 ## Implementation Steps
 
@@ -50,21 +50,22 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 - **GitHub Issue**: #3
 - **Type**: Auto
 - **Complexity**: M
+- **Status**: Complete
 - **Dependencies**: Step 1
 - **Acceptance Criteria**:
-  - [ ] SQLite database created at `~/Library/Application Support/Whippet/whippet.db`
-  - [ ] Schema includes tables: `sessions`, `events`, `settings`
-  - [ ] `sessions` table: id, session_id, cwd, model, started_at, last_activity_at, last_tool, status (active/stale/ended)
-  - [ ] `events` table: id, session_id, event_type, timestamp, raw_json
-  - [ ] `settings` table: key-value store for app configuration
-  - [ ] Swift wrapper with CRUD operations for all tables
-  - [ ] Database migrations support for future schema changes
+  - [x] SQLite database created at `~/Library/Application Support/Whippet/whippet.db`
+  - [x] Schema includes tables: `sessions`, `events`, `settings`
+  - [x] `sessions` table: id, session_id, cwd, model, started_at, last_activity_at, last_tool, status (active/stale/ended)
+  - [x] `events` table: id, session_id, event_type, timestamp, raw_json
+  - [x] `settings` table: key-value store for app configuration
+  - [x] Swift wrapper with CRUD operations for all tables
+  - [x] Database migrations support for future schema changes
 - **Testing / Verification**:
-  - [ ] Unit tests for all CRUD operations
-  - [ ] Verify database file is created on first launch
-  - [ ] Verify schema matches specification
+  - [x] Unit tests for all CRUD operations
+  - [x] Verify database file is created on first launch
+  - [x] Verify schema matches specification
 - **PR**: _TBD_
-- **Notes**: Use SQLite3 C API with a thin Swift wrapper, or GRDB.swift if package dependencies are acceptable.
+- **Notes**: Used SQLite3 C API with a thin Swift wrapper (DatabaseManager). WAL mode enabled for concurrent read performance. Migration system uses schema_migrations table. 23 unit tests covering all CRUD operations, schema validation, upsert behavior, and migration idempotency.
 
 ---
 
