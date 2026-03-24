@@ -4,11 +4,46 @@ import AppKit
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
+    private var databaseManager: DatabaseManager?
+    private var ingestionManager: EventIngestionManager?
 
     // MARK: - App Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBar()
+        setupDatabase()
+        setupIngestion()
+    }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        ingestionManager?.stop()
+    }
+
+    // MARK: - Database
+
+    private func setupDatabase() {
+        do {
+            databaseManager = try DatabaseManager()
+            NSLog("Whippet: Database initialized")
+        } catch {
+            NSLog("Whippet: Failed to initialize database: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - Ingestion
+
+    private func setupIngestion() {
+        guard let db = databaseManager else {
+            NSLog("Whippet: Cannot start ingestion without database")
+            return
+        }
+
+        ingestionManager = EventIngestionManager(databaseManager: db)
+        do {
+            try ingestionManager?.start()
+        } catch {
+            NSLog("Whippet: Failed to start event ingestion: \(error.localizedDescription)")
+        }
     }
 
     // MARK: - Menu Bar
