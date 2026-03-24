@@ -19,7 +19,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 | Total Steps | Complete | In Progress | Blocked | Not Started |
 |-------------|----------|-------------|---------|-------------|
-| 12          | 0        | 0           | 0       | 12          |
+| 12          | 1        | 0           | 0       | 11          |
 
 ## Implementation Steps
 
@@ -28,19 +28,20 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 - **GitHub Issue**: #2
 - **Type**: Auto
 - **Complexity**: M
+- **Status**: Complete
 - **Dependencies**: None (user must have created `~/projects/Whippet` repo)
 - **Acceptance Criteria**:
-  - [ ] Xcode project created with Swift, macOS target
-  - [ ] `LSUIElement` set to `YES` in Info.plist (no dock icon)
-  - [ ] AppDelegate creates an `NSStatusItem` with a placeholder icon in the menu bar
-  - [ ] Menu bar dropdown has "Show Sessions", "Settings", and "Quit" items
-  - [ ] App launches and shows the menu bar icon with no crashes
+  - [x] Xcode project created with Swift, macOS target
+  - [x] `LSUIElement` set to `YES` in Info.plist (no dock icon)
+  - [x] AppDelegate creates an `NSStatusItem` with a placeholder icon in the menu bar
+  - [x] Menu bar dropdown has "Show Sessions", "Settings", and "Quit" items
+  - [x] App launches and shows the menu bar icon with no crashes
 - **Testing / Verification**:
-  - [ ] Build succeeds with `xcodebuild`
-  - [ ] Launch app, verify menu bar icon appears
-  - [ ] Click menu items, verify they respond (can be no-ops for now)
+  - [x] Build succeeds with `xcodebuild`
+  - [x] Launch app, verify menu bar icon appears
+  - [x] Click menu items, verify they respond (can be no-ops for now)
 - **PR**: _TBD_
-- **Notes**: Use `@main` App protocol or AppDelegate-based lifecycle. AppDelegate is preferred for full AppKit control.
+- **Notes**: Used AppDelegate-based lifecycle with `@main` attribute. Menu bar icon uses SF Symbol `dog.fill`.
 
 ---
 
