@@ -7,6 +7,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var databaseManager: DatabaseManager?
     private var ingestionManager: EventIngestionManager?
     private var hookInstaller: HookInstaller?
+    private var livenessMonitor: SessionLivenessMonitor?
     private(set) var panelController = SessionPanelController()
 
     // MARK: - App Lifecycle
@@ -17,9 +18,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupPanelController()
         installHooksIfNeeded()
         setupIngestion()
+        setupLivenessMonitor()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        livenessMonitor?.stop()
         ingestionManager?.stop()
     }
 
@@ -73,6 +76,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             NSLog("Whippet: Failed to start event ingestion: \(error.localizedDescription)")
         }
+    }
+
+    // MARK: - Liveness Monitor
+
+    private func setupLivenessMonitor() {
+        guard let db = databaseManager else {
+            NSLog("Whippet: Cannot start liveness monitor without database")
+            return
+        }
+
+        livenessMonitor = SessionLivenessMonitor(databaseManager: db)
+        livenessMonitor?.start()
     }
 
     // MARK: - Menu Bar

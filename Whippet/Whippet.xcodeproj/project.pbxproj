@@ -24,6 +24,8 @@
 		A100000F /* SessionPanelControllerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000024 /* SessionPanelControllerTests.swift */; };
 		A1000100 /* SessionListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000033 /* SessionListViewModel.swift */; };
 		A1000101 /* SessionListViewModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000025 /* SessionListViewModelTests.swift */; };
+		A1000102 /* SessionLivenessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000034 /* SessionLivenessMonitor.swift */; };
+		A1000103 /* SessionLivenessMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000026 /* SessionLivenessMonitorTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,6 +58,8 @@
 		A1000031 /* SessionContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionContentView.swift; sourceTree = "<group>"; };
 		A1000032 /* SessionPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPanelController.swift; sourceTree = "<group>"; };
 		A1000033 /* SessionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListViewModel.swift; sourceTree = "<group>"; };
+		A1000034 /* SessionLivenessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLivenessMonitor.swift; sourceTree = "<group>"; };
+		A1000026 /* SessionLivenessMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLivenessMonitorTests.swift; sourceTree = "<group>"; };
 		A1000051 /* Whippet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Whippet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000061 /* WhippetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhippetTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -111,6 +115,7 @@
 				A1000023 /* HookInstallerTests.swift */,
 				A1000024 /* SessionPanelControllerTests.swift */,
 				A1000025 /* SessionListViewModelTests.swift */,
+				A1000026 /* SessionLivenessMonitorTests.swift */,
 			);
 			path = WhippetTests;
 			sourceTree = "<group>";
@@ -129,6 +134,7 @@
 			children = (
 				A1000016 /* EventIngestionManager.swift */,
 				A1000017 /* EventFile.swift */,
+				A1000034 /* SessionLivenessMonitor.swift */,
 			);
 			path = Ingestion;
 			sourceTree = "<group>";
@@ -262,6 +268,7 @@
 				A100000D /* SessionContentView.swift in Sources */,
 				A100000E /* SessionPanelController.swift in Sources */,
 				A1000100 /* SessionListViewModel.swift in Sources */,
+				A1000102 /* SessionLivenessMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -275,6 +282,7 @@
 				A100000B /* HookInstallerTests.swift in Sources */,
 				A100000F /* SessionPanelControllerTests.swift in Sources */,
 				A1000101 /* SessionListViewModelTests.swift in Sources */,
+				A1000103 /* SessionLivenessMonitorTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
