@@ -19,7 +19,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 | Total Steps | Complete | In Progress | Blocked | Not Started |
 |-------------|----------|-------------|---------|-------------|
-| 12          | 7        | 0           | 0       | 5           |
+| 12          | 8        | 0           | 0       | 4           |
 
 ## Implementation Steps
 
@@ -196,19 +196,20 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 - **GitHub Issue**: #9
 - **Type**: Auto
 - **Complexity**: M
+- **Status**: Complete
 - **Dependencies**: Step 6
 - **Acceptance Criteria**:
-  - [ ] Clicking a session row triggers the configured action
-  - [ ] Supported actions: open terminal at session's working directory, open session transcript file, copy session ID to clipboard, run custom shell command (with `$SESSION_ID`, `$CWD`, `$MODEL` substitution), send a macOS notification
-  - [ ] Action selection is stored in settings
-  - [ ] Custom shell command template is stored in settings
-  - [ ] Actions fail gracefully with user-visible error (e.g., transcript file not found)
+  - [x] Clicking a session row triggers the configured action
+  - [x] Supported actions: open terminal at session's working directory, open session transcript file, copy session ID to clipboard, run custom shell command (with `$SESSION_ID`, `$CWD`, `$MODEL` substitution), send a macOS notification
+  - [x] Action selection is stored in settings
+  - [x] Custom shell command template is stored in settings
+  - [x] Actions fail gracefully with user-visible error (e.g., transcript file not found)
 - **Testing / Verification**:
-  - [ ] Test each action type individually
-  - [ ] Test custom shell command with variable substitution
-  - [ ] Test error handling when action target doesn't exist
+  - [x] Test each action type individually
+  - [x] Test custom shell command with variable substitution
+  - [x] Test error handling when action target doesn't exist
 - **PR**: _TBD_
-- **Notes**: "Open terminal" should open the default terminal app (Terminal.app or iTerm2) at the session's `cwd`.
+- **Notes**: SessionClickAction enum with 5 action types. SessionActionHandler reads configured action from SQLite settings table (defaults to openTerminal). Open terminal tries iTerm2 first via AppleScript, falls back to Terminal.app. Custom commands support $SESSION_ID, $CWD, $MODEL substitution. Session rows have hover highlight and click handling wired through SessionGroupView. Error banner shown at bottom of session panel for 4 seconds. 25 unit tests covering all action types, variable substitution, settings persistence, and error handling.
 
 ---
 
