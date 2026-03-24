@@ -19,7 +19,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 | Total Steps | Complete | In Progress | Blocked | Not Started |
 |-------------|----------|-------------|---------|-------------|
-| 12          | 6        | 0           | 0       | 6           |
+| 12          | 7        | 0           | 0       | 5           |
 
 ## Implementation Steps
 
@@ -172,21 +172,22 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 - **GitHub Issue**: #8
 - **Type**: Auto
 - **Complexity**: S
+- **Status**: Complete
 - **Dependencies**: Steps 2, 3
 - **Acceptance Criteria**:
-  - [ ] A repeating timer checks all active sessions against the staleness timeout
-  - [ ] Sessions with no events within the timeout are marked as "stale" in the database
-  - [ ] Default timeout is 1 minute
-  - [ ] Timeout is configurable via settings (stored in SQLite `settings` table)
-  - [ ] Stale sessions that receive a new event are promoted back to "active"
-  - [ ] Sessions that receive a `SessionEnd` event are marked "ended" regardless of timeout
+  - [x] A repeating timer checks all active sessions against the staleness timeout
+  - [x] Sessions with no events within the timeout are marked as "stale" in the database
+  - [x] Default timeout is 1 minute
+  - [x] Timeout is configurable via settings (stored in SQLite `settings` table)
+  - [x] Stale sessions that receive a new event are promoted back to "active"
+  - [x] Sessions that receive a `SessionEnd` event are marked "ended" regardless of timeout
 - **Testing / Verification**:
-  - [ ] Unit test: session with no activity past timeout → marked stale
-  - [ ] Unit test: stale session receiving new event → back to active
-  - [ ] Unit test: SessionEnd always marks ended
-  - [ ] Integration test: start session, wait > timeout, verify UI shows stale
+  - [x] Unit test: session with no activity past timeout → marked stale
+  - [x] Unit test: stale session receiving new event → back to active
+  - [x] Unit test: SessionEnd always marks ended
+  - [x] Integration test: start session, wait > timeout, verify UI shows stale
 - **PR**: _TBD_
-- **Notes**:
+- **Notes**: SessionLivenessMonitor uses DispatchSourceTimer on a utility-QoS queue with 10s check interval. Default timeout is 60s, configurable via `staleness_timeout` settings key. Existing upsert logic in EventIngestionManager handles stale-to-active promotion automatically. 18 unit tests covering timeout configuration, staleness detection, stale promotion, SessionEnd behavior, and callbacks.
 
 ---
 
