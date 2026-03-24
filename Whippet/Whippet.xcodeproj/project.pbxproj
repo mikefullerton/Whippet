@@ -10,6 +10,9 @@
 		A1000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000010 /* AppDelegate.swift */; };
 		A1000002 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000011 /* Assets.xcassets */; };
 		A1000003 /* WhippetTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000020 /* WhippetTests.swift */; };
+		A1000004 /* DatabaseManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000014 /* DatabaseManager.swift */; };
+		A1000005 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000015 /* Models.swift */; };
+		A1000006 /* DatabaseManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000021 /* DatabaseManagerTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -27,7 +30,10 @@
 		A1000011 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		A1000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000013 /* Whippet.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Whippet.entitlements; sourceTree = "<group>"; };
+		A1000014 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
+		A1000015 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		A1000020 /* WhippetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhippetTests.swift; sourceTree = "<group>"; };
+		A1000021 /* DatabaseManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManagerTests.swift; sourceTree = "<group>"; };
 		A1000051 /* Whippet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Whippet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000061 /* WhippetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhippetTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -63,6 +69,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000010 /* AppDelegate.swift */,
+				A1000084 /* Database */,
 				A1000011 /* Assets.xcassets */,
 				A1000012 /* Info.plist */,
 				A1000013 /* Whippet.entitlements */,
@@ -74,8 +81,18 @@
 			isa = PBXGroup;
 			children = (
 				A1000020 /* WhippetTests.swift */,
+				A1000021 /* DatabaseManagerTests.swift */,
 			);
 			path = WhippetTests;
+			sourceTree = "<group>";
+		};
+		A1000084 /* Database */ = {
+			isa = PBXGroup;
+			children = (
+				A1000014 /* DatabaseManager.swift */,
+				A1000015 /* Models.swift */,
+			);
+			path = Database;
 			sourceTree = "<group>";
 		};
 		A1000083 /* Products */ = {
@@ -179,6 +196,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000001 /* AppDelegate.swift in Sources */,
+				A1000004 /* DatabaseManager.swift in Sources */,
+				A1000005 /* Models.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -187,6 +206,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000003 /* WhippetTests.swift in Sources */,
+				A1000006 /* DatabaseManagerTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
