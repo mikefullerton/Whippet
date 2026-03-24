@@ -25,7 +25,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 ### Step 1: Project Scaffold & Menu Bar Shell
 
-- **GitHub Issue**: #68
+- **GitHub Issue**: #2
 - **Type**: Auto
 - **Complexity**: M
 - **Dependencies**: None (user must have created `~/projects/Whippet` repo)
@@ -46,7 +46,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 ### Step 2: SQLite Database Layer
 
-- **GitHub Issue**: #69
+- **GitHub Issue**: #3
 - **Type**: Auto
 - **Complexity**: M
 - **Dependencies**: Step 1
@@ -69,7 +69,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 ### Step 3: Drop Directory & Event Ingestion
 
-- **GitHub Issue**: #70
+- **GitHub Issue**: #4
 - **Type**: Auto
 - **Complexity**: M
 - **Dependencies**: Step 2
@@ -92,7 +92,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 ### Step 4: Hook Auto-Installation
 
-- **GitHub Issue**: #71
+- **GitHub Issue**: #5
 - **Type**: Auto
 - **Complexity**: M
 - **Dependencies**: Step 3
@@ -115,7 +115,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 ### Step 5: Floating Window Shell (NSPanel)
 
-- **GitHub Issue**: #72
+- **GitHub Issue**: #6
 - **Type**: Auto
 - **Complexity**: M
 - **Dependencies**: Step 1
@@ -139,7 +139,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 ### Step 6: Session List UI
 
-- **GitHub Issue**: #73
+- **GitHub Issue**: #7
 - **Type**: Auto
 - **Complexity**: M
 - **Dependencies**: Steps 2, 3, 5
@@ -163,7 +163,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 ### Step 7: Session Liveness Detection
 
-- **GitHub Issue**: #74
+- **GitHub Issue**: #8
 - **Type**: Auto
 - **Complexity**: S
 - **Dependencies**: Steps 2, 3
@@ -186,7 +186,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 ### Step 8: Click Actions System
 
-- **GitHub Issue**: #75
+- **GitHub Issue**: #9
 - **Type**: Auto
 - **Complexity**: M
 - **Dependencies**: Step 6
@@ -207,7 +207,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 ### Step 9: Settings UI
 
-- **GitHub Issue**: #76
+- **GitHub Issue**: #10
 - **Type**: Auto
 - **Complexity**: M
 - **Dependencies**: Steps 5, 7, 8
@@ -231,7 +231,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 ### Step 10: macOS Notifications
 
-- **GitHub Issue**: #77
+- **GitHub Issue**: #11
 - **Type**: Auto
 - **Complexity**: S
 - **Dependencies**: Steps 3, 9
@@ -252,7 +252,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 ### Step 11: Launch at Login
 
-- **GitHub Issue**: #78
+- **GitHub Issue**: #12
 - **Type**: Auto
 - **Complexity**: S
 - **Dependencies**: Step 9
@@ -273,7 +273,7 @@ macOS app using Swift, AppKit (NSPanel, NSStatusItem, NSHostingController), Swif
 
 ### Step 12: Integration Testing & Polish
 
-- **GitHub Issue**: #79
+- **GitHub Issue**: #13
 - **Type**: Manual
 - **Complexity**: M
 - **Dependencies**: Steps 1–11
