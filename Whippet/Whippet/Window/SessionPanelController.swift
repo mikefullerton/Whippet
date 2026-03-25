@@ -18,6 +18,10 @@ final class SessionPanelController {
     /// Called when the user clicks the gear icon. AppDelegate wires this to open settings.
     var onSettingsRequested: (() -> Void)?
 
+    // Window discovery panel
+    private var discoveryPanel: NSPanel?
+    private var discoveryHosting: NSHostingController<WindowDiscoveryView>?
+
     // MARK: - Initialization
 
     init() {}
@@ -27,6 +31,11 @@ final class SessionPanelController {
     func setDatabaseManager(_ databaseManager: DatabaseManager) {
         self.databaseManager = databaseManager
         self.viewModel = SessionListViewModel(databaseManager: databaseManager)
+
+        // Wire up window discovery request from click actions
+        self.viewModel?.onWindowDiscoveryRequested = { [weak self] session in
+            self?.showWindowDiscovery(for: session)
+        }
     }
 
     // MARK: - Panel Creation
@@ -137,6 +146,47 @@ final class SessionPanelController {
             Log.app.info("User confirmed quit from close button")
             NSApplication.shared.terminate(nil)
         }
+    }
+
+    // MARK: - Window Discovery
+
+    func showWindowDiscovery(for session: Session) {
+        // Dismiss any existing discovery panel
+        dismissWindowDiscovery()
+
+        let vm = WindowDiscoveryViewModel(session: session)
+        vm.onWindowActivated = { [weak self] in
+            self?.dismissWindowDiscovery()
+        }
+
+        let view = WindowDiscoveryView(viewModel: vm)
+        let hosting = NSHostingController(rootView: view)
+        hosting.sizingOptions = [.preferredContentSize]
+
+        let discoveryPanel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 380, height: 420),
+            styleMask: [.titled, .closable, .resizable, .utilityWindow],
+            backing: .buffered,
+            defer: false
+        )
+        discoveryPanel.title = "Window Discovery"
+        discoveryPanel.contentView = hosting.view
+        discoveryPanel.level = .floating
+        discoveryPanel.isReleasedWhenClosed = false
+        discoveryPanel.hidesOnDeactivate = false
+        discoveryPanel.minSize = NSSize(width: 300, height: 200)
+        discoveryPanel.center()
+        discoveryPanel.orderFront(nil)
+
+        self.discoveryPanel = discoveryPanel
+        self.discoveryHosting = hosting
+        Log.ui.debug("Window discovery panel shown for '\(session.projectName, privacy: .public)'")
+    }
+
+    func dismissWindowDiscovery() {
+        discoveryPanel?.orderOut(nil)
+        discoveryPanel = nil
+        discoveryHosting = nil
     }
 
     // MARK: - Configuration

@@ -56,6 +56,9 @@ final class SessionListViewModel: ObservableObject {
     /// If the last error was a permission issue, the Settings pane the user should open.
     @Published var lastPermissionPane: PermissionPane?
 
+    /// Called when the activateWindow action needs a discovery panel shown.
+    var onWindowDiscoveryRequested: ((Session) -> Void)?
+
     /// Notification name posted when new events are ingested.
     static let sessionsDidChangeNotification = Notification.Name("WhippetSessionsDidChange")
 
@@ -164,6 +167,14 @@ final class SessionListViewModel: ObservableObject {
     // MARK: - Click Actions
 
     func handleSessionClick(_ session: Session) {
+        let action = actionHandler.currentAction
+
+        // For activateWindow, show the discovery panel instead of auto-matching
+        if action == .activateWindow {
+            onWindowDiscoveryRequested?(session)
+            return
+        }
+
         let result = actionHandler.execute(for: session)
         switch result {
         case .success:

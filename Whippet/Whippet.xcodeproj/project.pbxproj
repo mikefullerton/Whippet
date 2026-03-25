@@ -41,6 +41,8 @@
 		A1000110 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100003D /* main.swift */; };
 		A1000111 /* GitMetadataResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100003E /* GitMetadataResolver.swift */; };
 		A1000112 /* IngestionIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100002B /* IngestionIntegrationTests.swift */; };
+		A1000113 /* WindowDiscoveryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100003F /* WindowDiscoveryViewModel.swift */; };
+		A1000114 /* WindowDiscoveryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000043 /* WindowDiscoveryView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -90,6 +92,8 @@
 		A100003D /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
 		A100003E /* GitMetadataResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitMetadataResolver.swift; sourceTree = "<group>"; };
 		A100002B /* IngestionIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngestionIntegrationTests.swift; sourceTree = "<group>"; };
+		A100003F /* WindowDiscoveryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowDiscoveryViewModel.swift; sourceTree = "<group>"; };
+		A1000043 /* WindowDiscoveryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowDiscoveryView.swift; sourceTree = "<group>"; };
 		A1000051 /* Whippet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Whippet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000061 /* WhippetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhippetTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -204,6 +208,8 @@
 				A1000031 /* SessionContentView.swift */,
 				A1000032 /* SessionPanelController.swift */,
 				A1000033 /* SessionListViewModel.swift */,
+				A100003F /* WindowDiscoveryViewModel.swift */,
+				A1000043 /* WindowDiscoveryView.swift */,
 			);
 			path = Window;
 			sourceTree = "<group>";
@@ -348,6 +354,8 @@
 				A100010F /* Log.swift in Sources */,
 				A1000110 /* main.swift in Sources */,
 				A1000111 /* GitMetadataResolver.swift in Sources */,
+				A1000113 /* WindowDiscoveryViewModel.swift in Sources */,
+				A1000114 /* WindowDiscoveryView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

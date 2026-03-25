@@ -69,6 +69,13 @@ final class SessionActionHandler {
     static let clickActionKey = "click_action"
     static let customCommandKey = "custom_command_template"
 
+    // MARK: - Accessibility
+
+    /// Checks whether accessibility access has been granted. Does NOT prompt.
+    static var isAccessibilityTrusted: Bool {
+        AXIsProcessTrusted()
+    }
+
     // MARK: - Properties
 
     private let databaseManager: DatabaseManager
@@ -274,6 +281,15 @@ final class SessionActionHandler {
             if bestMatch != nil { break }
         }
 
+        // Check accessibility permission upfront — don't re-prompt if already denied
+        guard Self.isAccessibilityTrusted else {
+            Log.actions.error("activateWarp: Accessibility permission not granted")
+            return .failure(.permissionDenied(
+                "Whippet needs Accessibility access to raise Warp windows. Grant access in System Settings.",
+                pane: .accessibility
+            ))
+        }
+
         // Strategy 2: Use Accessibility API to find and raise the matching window
         Log.actions.debug("activateWarp: querying Accessibility API for Warp windows")
         let axApp = AXUIElementCreateApplication(warpPID)
@@ -282,13 +298,6 @@ final class SessionActionHandler {
 
         if axResult != .success {
             Log.actions.warning("activateWarp: AXUIElementCopyAttributeValue failed with \(axResult.rawValue)")
-            if axResult == .apiDisabled || axResult == .notImplemented {
-                Log.actions.error("activateWarp: Accessibility permission not granted")
-                return .failure(.permissionDenied(
-                    "Whippet needs Accessibility access to raise Warp windows. Grant access in System Settings.",
-                    pane: .accessibility
-                ))
-            }
         }
 
         let axWindows = (axWindowsRef as? [AXUIElement]) ?? []
@@ -350,29 +359,33 @@ final class SessionActionHandler {
             return .failure(.commandFailed("No project name to match — session has no working directory"))
         }
 
-        guard let windowList = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]] else {
-            Log.actions.error("activateWindow: CGWindowListCopyWindowInfo returned nil")
-            return .failure(.commandFailed("Unable to read window list"))
+        guard Self.isAccessibilityTrusted else {
+            Log.actions.error("activateWindow: Accessibility permission not granted")
+            return .failure(.permissionDenied(
+                "Whippet needs Accessibility access to discover windows. Grant access in System Settings.",
+                pane: .accessibility
+            ))
         }
 
-        Log.actions.debug("activateWindow: scanning \(windowList.count) windows")
+        // Use Accessibility API to enumerate windows (doesn't need Screen Recording)
+        for app in NSWorkspace.shared.runningApplications {
+            guard app.activationPolicy == .regular else { continue }
+            let pid = app.processIdentifier
+            let axApp = AXUIElementCreateApplication(pid)
+            var windowsRef: CFTypeRef?
+            guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
+                  let axWindows = windowsRef as? [AXUIElement] else { continue }
 
-        for entry in windowList {
-            guard let ownerPID = entry[kCGWindowOwnerPID as String] as? pid_t,
-                  let windowName = entry[kCGWindowName as String] as? String,
-                  !windowName.isEmpty else {
-                continue
-            }
+            for axWindow in axWindows {
+                var titleRef: CFTypeRef?
+                AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleRef)
+                guard let title = titleRef as? String, !title.isEmpty else { continue }
 
-            let ownerName = entry[kCGWindowOwnerName as String] as? String ?? "?"
-            let layer = entry[kCGWindowLayer as String] as? Int ?? -1
-
-            if windowName.localizedCaseInsensitiveContains(projectName) && layer == 0 {
-                Log.actions.info("activateWindow: matched '\(windowName, privacy: .public)' in \(ownerName, privacy: .public) (PID \(ownerPID))")
-
-                if let app = NSRunningApplication(processIdentifier: ownerPID) {
+                if title.localizedCaseInsensitiveContains(projectName) {
+                    let appName = app.localizedName ?? "?"
+                    Log.actions.info("activateWindow: matched '\(title, privacy: .public)' in \(appName, privacy: .public) (PID \(pid))")
                     app.activate()
-                    raiseWindow(pid: ownerPID, windowName: windowName)
+                    AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
                     return .success
                 }
             }
@@ -383,6 +396,11 @@ final class SessionActionHandler {
     }
 
     private func raiseWindow(pid: pid_t, windowName: String) {
+        guard Self.isAccessibilityTrusted else {
+            Log.actions.debug("raiseWindow: accessibility not trusted, skipping")
+            return
+        }
+
         let appElement = AXUIElementCreateApplication(pid)
         var windowsRef: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(appElement, kAXWindowsAttribute as CFString, &windowsRef)
