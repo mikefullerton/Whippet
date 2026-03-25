@@ -23,7 +23,13 @@ xcodebuild -scheme Whippet -configuration Debug build
 
 ## Shared Component Specs
 
-UI component specs are at `../litterbox/ui/` — when implementing a component from a spec, read the spec file and implement it idiomatically for this project's platform.
+This project uses component specs from the [litterbox](https://github.com/mikefullerton/litterbox) repo.
+
+- **Expected path**: `../litterbox/`
+- **Repo**: `git@github.com:mikefullerton/litterbox.git`
+- Before reading any spec, verify `../litterbox/` exists. If it doesn't, ask the user whether to clone it.
+- Component specs are in `../litterbox/` — read the spec and implement idiomatically for this project's platform.
+- When implementing any feature or component, first check for an existing spec. If none exists, offer to create one following `../litterbox/ui/_template.md` and save it back to that repo.
 
 ## Conventions
 
