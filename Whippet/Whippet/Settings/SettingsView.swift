@@ -62,15 +62,16 @@ struct SettingsView: View {
 
 // MARK: - Settings Drawer View (for NSSplitViewItem inspector)
 
-/// Compact single-column settings for the native inspector panel.
-/// Uses DisclosureGroups so users can expand only the section they need.
+/// Settings view for the native inspector panel. Uses NavigationSplitView
+/// with topic sidebar on the left and scrollable detail on the right.
 struct SettingsDrawerView: View {
     @ObservedObject var viewModel: SettingsViewModel
     var onClose: (() -> Void)?
+    @State private var selectedTopic: SettingsTopic = .appearance
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Header with close button
             HStack {
                 Text("Settings")
                     .font(.system(size: 13, weight: .semibold))
@@ -89,52 +90,34 @@ struct SettingsDrawerView: View {
 
             Divider()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 4) {
-                    settingsSection("Appearance", image: "paintbrush") {
-                        AppearanceSettingsPane(viewModel: viewModel)
-                    }
-                    settingsSection("General", image: "gearshape") {
-                        GeneralSettingsPane(viewModel: viewModel)
-                    }
-                    settingsSection("Window", image: "macwindow") {
-                        WindowSettingsPane(viewModel: viewModel)
-                    }
-                    settingsSection("Actions", image: "cursorarrow.click") {
-                        ActionsSettingsPane(viewModel: viewModel)
-                    }
-                    settingsSection("Notifications", image: "bell") {
-                        NotificationsSettingsPane(viewModel: viewModel)
-                    }
-                    settingsSection("AI", image: "brain") {
-                        AISettingsPane(viewModel: viewModel)
-                    }
-                    settingsSection("Startup", image: "power") {
-                        StartupSettingsPane(viewModel: viewModel)
-                    }
+            NavigationSplitView {
+                List(SettingsTopic.allCases, selection: $selectedTopic) { topic in
+                    Label(topic.rawValue, systemImage: topic.systemImage)
+                        .tag(topic)
                 }
-                .padding(8)
+                .listStyle(.sidebar)
+                .navigationSplitViewColumnWidth(min: 120, ideal: 140, max: 170)
+            } detail: {
+                ScrollView {
+                    detailContent
+                        .padding(16)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
         }
-        .frame(minWidth: 280)
     }
 
-    private func settingsSection<Content: View>(
-        _ title: String,
-        image: String,
-        @ViewBuilder content: @escaping () -> Content
-    ) -> some View {
-        DisclosureGroup {
-            content()
-                .padding(.top, 8)
-                .padding(.horizontal, 4)
-                .padding(.bottom, 4)
-        } label: {
-            Label(title, systemImage: image)
-                .font(.system(size: 11, weight: .medium))
+    @ViewBuilder
+    private var detailContent: some View {
+        switch selectedTopic {
+        case .appearance: AppearanceSettingsPane(viewModel: viewModel)
+        case .general: GeneralSettingsPane(viewModel: viewModel)
+        case .window: WindowSettingsPane(viewModel: viewModel)
+        case .actions: ActionsSettingsPane(viewModel: viewModel)
+        case .notifications: NotificationsSettingsPane(viewModel: viewModel)
+        case .ai: AISettingsPane(viewModel: viewModel)
+        case .startup: StartupSettingsPane(viewModel: viewModel)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
     }
 }
 

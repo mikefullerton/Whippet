@@ -89,9 +89,9 @@ final class SessionPanelController {
         settingsHosting.sizingOptions = [.preferredContentSize]
 
         let inspector = NSSplitViewItem(inspectorWithViewController: settingsHosting)
-        inspector.minimumThickness = 280
-        inspector.maximumThickness = 340
-        inspector.preferredThicknessFraction = 0.45
+        inspector.minimumThickness = 440
+        inspector.maximumThickness = 600
+        inspector.preferredThicknessFraction = 0.55
         inspector.isCollapsed = true
         self.inspectorItem = inspector
 
