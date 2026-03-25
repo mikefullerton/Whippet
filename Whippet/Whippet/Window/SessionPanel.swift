@@ -1,16 +1,20 @@
 import AppKit
 
-/// A floating NSPanel for displaying Claude Code session information.
+/// A floating palette-style NSPanel for displaying Claude Code sessions.
 ///
-/// This panel is configured as a utility window with non-activating behavior,
-/// meaning it won't steal focus from other applications. It supports configurable
-/// window level (floating vs normal) and transparency.
+/// Has a visible title bar with close button (prompts to quit) and a gear icon
+/// for settings. Stays above all windows when floating is enabled.
 final class SessionPanel: NSPanel {
+
+    /// Called when the user clicks the close button. The controller should present
+    /// a quit confirmation instead of actually closing.
+    var onCloseButtonPressed: (() -> Void)?
+
+    /// Called when the user clicks the gear icon in the title bar.
+    var onSettingsButtonPressed: (() -> Void)?
 
     // MARK: - Initialization
 
-    /// Creates a new SessionPanel with default utility window configuration.
-    /// - Parameter contentRect: The initial frame for the panel.
     init(contentRect: NSRect) {
         super.init(
             contentRect: contentRect,
@@ -19,35 +23,59 @@ final class SessionPanel: NSPanel {
                 .closable,
                 .resizable,
                 .utilityWindow,
-                .nonactivatingPanel
+                .nonactivatingPanel,
             ],
             backing: .buffered,
             defer: false
         )
 
         configureDefaults()
+        addTitleBarAccessory()
     }
 
     // MARK: - Configuration
 
     private func configureDefaults() {
-        title = "Whippet Sessions"
+        title = "Whippet"
         isReleasedWhenClosed = false
         hidesOnDeactivate = false
         level = .floating
         isMovableByWindowBackground = true
-        minSize = NSSize(width: 320, height: 200)
+        minSize = NSSize(width: 280, height: 120)
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
-        // Default transparency
-        alphaValue = 1.0
+        alphaValue = 0.96
         isOpaque = false
         backgroundColor = .windowBackgroundColor
     }
 
+    private func addTitleBarAccessory() {
+        let gearButton = NSButton(frame: NSRect(x: 0, y: 0, width: 28, height: 28))
+        gearButton.bezelStyle = .accessoryBarAction
+        gearButton.image = NSImage(systemSymbolName: "gearshape", accessibilityDescription: "Settings")
+        gearButton.imagePosition = .imageOnly
+        gearButton.isBordered = false
+        gearButton.target = self
+        gearButton.action = #selector(gearButtonClicked)
+
+        let accessoryView = NSTitlebarAccessoryViewController()
+        accessoryView.layoutAttribute = .trailing
+        accessoryView.view = gearButton
+        addTitlebarAccessoryViewController(accessoryView)
+    }
+
+    @objc private func gearButtonClicked() {
+        onSettingsButtonPressed?()
+    }
+
+    // MARK: - Close → Quit Confirmation
+
+    override func close() {
+        onCloseButtonPressed?()
+    }
+
     // MARK: - Window Level
 
-    /// Whether the panel floats above all other windows.
     var isFloating: Bool {
         get { level == .floating }
         set { level = newValue ? .floating : .normal }
@@ -55,8 +83,6 @@ final class SessionPanel: NSPanel {
 
     // MARK: - Transparency
 
-    /// The panel's transparency value (0.0 fully transparent to 1.0 fully opaque).
-    /// Clamped to a usable range of 0.3...1.0 so the window never becomes invisible.
     var transparency: CGFloat {
         get { alphaValue }
         set { alphaValue = min(max(newValue, 0.3), 1.0) }
@@ -64,10 +90,6 @@ final class SessionPanel: NSPanel {
 
     // MARK: - Key/Main Behavior
 
-    /// Allow the panel to become key so it can receive keyboard events when focused.
     override var canBecomeKey: Bool { true }
-
-    /// Prevent the panel from becoming main window to avoid
-    /// disrupting the main app's window ordering.
     override var canBecomeMain: Bool { false }
 }

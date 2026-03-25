@@ -5,6 +5,12 @@ enum SessionClickAction: String, CaseIterable {
     /// Opens the default terminal app at the session's working directory.
     case openTerminal = "open_terminal"
 
+    /// Activates the Warp terminal tab whose working directory matches the session's cwd.
+    case activateWarp = "activate_warp"
+
+    /// Activates any window in any app whose title contains the session's project name.
+    case activateWindow = "activate_window"
+
     /// Opens the session transcript file in the default application.
     case openTranscript = "open_transcript"
 
@@ -21,6 +27,8 @@ enum SessionClickAction: String, CaseIterable {
     var displayName: String {
         switch self {
         case .openTerminal: return "Open Terminal"
+        case .activateWarp: return "Activate in Warp"
+        case .activateWindow: return "Activate Window"
         case .openTranscript: return "Open Transcript"
         case .copySessionId: return "Copy Session ID"
         case .customCommand: return "Run Custom Command"
@@ -32,6 +40,8 @@ enum SessionClickAction: String, CaseIterable {
     var systemImage: String {
         switch self {
         case .openTerminal: return "terminal"
+        case .activateWarp: return "text.cursor.beam"
+        case .activateWindow: return "macwindow"
         case .openTranscript: return "doc.text"
         case .copySessionId: return "doc.on.clipboard"
         case .customCommand: return "command"

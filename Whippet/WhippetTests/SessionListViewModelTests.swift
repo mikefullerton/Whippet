@@ -34,7 +34,7 @@ final class SessionListViewModelTests: XCTestCase {
     // MARK: - Loading Sessions
 
     func testLoadSessionsFromDatabase() throws {
-        // Insert test sessions
+        // Insert test sessions — ended sessions are excluded from the view
         try databaseManager.upsertSession(Session(
             sessionId: "session-1",
             cwd: "/Users/test/projects/Alpha",
@@ -52,7 +52,7 @@ final class SessionListViewModelTests: XCTestCase {
             startedAt: "2026-03-24T09:00:00Z",
             lastActivityAt: "2026-03-24T09:30:00Z",
             lastTool: "Edit",
-            status: .ended
+            status: .stale
         ))
 
         viewModel.loadSessions()
@@ -86,51 +86,43 @@ final class SessionListViewModelTests: XCTestCase {
             sessionId: "session-3",
             cwd: "/Users/test/projects/OtherProject",
             model: "claude-3.5-sonnet",
-            status: .ended
+            status: .stale
         ))
 
         viewModel.loadSessions()
 
+        // Groups sorted alphabetically
         XCTAssertEqual(viewModel.groups.count, 2)
+        XCTAssertEqual(viewModel.groups[0].projectName, "OtherProject")
+        XCTAssertEqual(viewModel.groups[1].projectName, "Whippet")
 
-        // Find the Whippet group
         let whippetGroup = viewModel.groups.first { $0.projectName == "Whippet" }
         XCTAssertNotNil(whippetGroup)
         XCTAssertEqual(whippetGroup?.sessions.count, 2)
         XCTAssertTrue(whippetGroup?.hasActiveSessions ?? false)
-
-        // Find the OtherProject group
-        let otherGroup = viewModel.groups.first { $0.projectName == "OtherProject" }
-        XCTAssertNotNil(otherGroup)
-        XCTAssertEqual(otherGroup?.sessions.count, 1)
-        XCTAssertFalse(otherGroup?.hasActiveSessions ?? true)
     }
 
-    func testGroupsWithActiveSessionsSortedFirst() throws {
-        // Create a group with only ended sessions (older activity)
+    func testGroupsSortedAlphabetically() throws {
         try databaseManager.upsertSession(Session(
-            sessionId: "session-ended",
-            cwd: "/Users/test/projects/EndedProject",
+            sessionId: "session-stale",
+            cwd: "/Users/test/projects/Zebra",
             model: "claude-3.5-sonnet",
-            lastActivityAt: "2026-03-24T12:00:00Z",
-            status: .ended
+            status: .stale
         ))
 
-        // Create a group with an active session (older start time but active)
         try databaseManager.upsertSession(Session(
             sessionId: "session-active",
-            cwd: "/Users/test/projects/ActiveProject",
+            cwd: "/Users/test/projects/Alpha",
             model: "claude-3.5-sonnet",
-            lastActivityAt: "2026-03-24T08:00:00Z",
             status: .active
         ))
 
         viewModel.loadSessions()
 
         XCTAssertEqual(viewModel.groups.count, 2)
-        // Active group should be first even though its activity is older
-        XCTAssertEqual(viewModel.groups[0].projectName, "ActiveProject")
-        XCTAssertEqual(viewModel.groups[1].projectName, "EndedProject")
+        // Groups should be sorted alphabetically, not by activity
+        XCTAssertEqual(viewModel.groups[0].projectName, "Alpha")
+        XCTAssertEqual(viewModel.groups[1].projectName, "Zebra")
     }
 
     func testSessionsWithEmptyCwdGroupedAsUnknown() throws {
@@ -157,8 +149,26 @@ final class SessionListViewModelTests: XCTestCase {
 
         viewModel.loadSessions()
 
-        XCTAssertEqual(viewModel.sessionCount, 4)
+        // Session counts only include live sessions
+        XCTAssertEqual(viewModel.sessionCount, 3)
         XCTAssertEqual(viewModel.activeSessionCount, 2)
+        // But all 4 projects appear as sticky groups
+        XCTAssertEqual(viewModel.groups.count, 4)
+    }
+
+    func testEndedSessionsExcludedButProjectsStick() throws {
+        try databaseManager.upsertSession(Session(sessionId: "s1", cwd: "/a", status: .active))
+        try databaseManager.upsertSession(Session(sessionId: "s2", cwd: "/b", status: .ended))
+        try databaseManager.upsertSession(Session(sessionId: "s3", cwd: "/c", status: .ended))
+
+        viewModel.loadSessions()
+
+        // Only 1 live session, but all 3 projects should appear as sticky groups
+        XCTAssertEqual(viewModel.sessionCount, 1, "Only active/stale sessions count")
+        XCTAssertEqual(viewModel.groups.count, 3, "Ended projects still appear as sticky groups")
+        // The ended groups should have 0 sessions
+        let endedGroups = viewModel.groups.filter { $0.sessions.isEmpty }
+        XCTAssertEqual(endedGroups.count, 2)
     }
 
     // MARK: - Real-time Updates via Notification
@@ -203,7 +213,8 @@ final class SessionListViewModelTests: XCTestCase {
             sessions: [
                 Session(sessionId: "s1", cwd: "/test/TestProject", status: .active),
                 Session(sessionId: "s2", cwd: "/test/TestProject", status: .ended)
-            ]
+            ],
+            abbreviatedPath: "/test/TestProject"
         )
 
         XCTAssertEqual(group.id, "TestProject")
@@ -217,7 +228,8 @@ final class SessionListViewModelTests: XCTestCase {
             sessions: [
                 Session(sessionId: "s1", cwd: "/test/DoneProject", status: .ended),
                 Session(sessionId: "s2", cwd: "/test/DoneProject", status: .stale)
-            ]
+            ],
+            abbreviatedPath: "/test/DoneProject"
         )
 
         XCTAssertFalse(group.hasActiveSessions)
@@ -226,7 +238,7 @@ final class SessionListViewModelTests: XCTestCase {
     // MARK: - Multiple Projects Grouping
 
     func testMultipleProjectsGroupCorrectly() throws {
-        let projects = ["Alpha", "Beta", "Gamma"]
+        let projects = ["Gamma", "Alpha", "Beta"]
         var sessionIndex = 0
 
         for project in projects {
@@ -236,7 +248,7 @@ final class SessionListViewModelTests: XCTestCase {
                     sessionId: "session-\(sessionIndex)",
                     cwd: "/Users/test/projects/\(project)",
                     model: "claude-3.5-sonnet",
-                    status: i == 0 ? .active : .ended
+                    status: i == 0 ? .active : .stale
                 ))
             }
         }
@@ -247,7 +259,11 @@ final class SessionListViewModelTests: XCTestCase {
         XCTAssertEqual(viewModel.sessionCount, 9)
         XCTAssertEqual(viewModel.activeSessionCount, 3)
 
-        // Each group should have 3 sessions
+        // Should be sorted alphabetically
+        XCTAssertEqual(viewModel.groups[0].projectName, "Alpha")
+        XCTAssertEqual(viewModel.groups[1].projectName, "Beta")
+        XCTAssertEqual(viewModel.groups[2].projectName, "Gamma")
+
         for group in viewModel.groups {
             XCTAssertEqual(group.sessions.count, 3, "Group \(group.projectName) should have 3 sessions")
         }
@@ -260,7 +276,7 @@ final class SessionListViewModelTests: XCTestCase {
             sessionId: "old-session",
             cwd: "/Users/test/projects/Project",
             lastActivityAt: "2026-03-24T08:00:00Z",
-            status: .ended
+            status: .stale
         ))
 
         try databaseManager.upsertSession(Session(

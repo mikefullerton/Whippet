@@ -21,3 +21,4 @@ Packages/
 
 # Claude Code
 .claude/plans/
+default.profraw

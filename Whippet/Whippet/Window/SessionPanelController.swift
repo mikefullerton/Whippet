@@ -2,31 +2,21 @@ import AppKit
 import SwiftUI
 
 /// Manages the lifecycle and visibility of the floating session panel.
-///
-/// Responsibilities:
-/// - Creates and configures the SessionPanel with SwiftUI content via NSHostingController
-/// - Toggles panel visibility from the menu bar
-/// - Remembers panel position between show/hide cycles
-/// - Exposes window level and transparency configuration
-/// - Hosts the SessionListViewModel that drives the session list UI
 final class SessionPanelController {
 
     // MARK: - Properties
 
-    /// The underlying NSPanel instance.
     private(set) var panel: SessionPanel?
-
-    /// The view model that drives the session list. Created when the database manager is set.
     private(set) var viewModel: SessionListViewModel?
-
-    /// The last saved frame origin, used to restore position between toggles.
-    private var savedOrigin: NSPoint?
+    private var hostingController: NSHostingController<SessionContentView>?
 
     /// Key used to persist the panel frame in UserDefaults.
     static let frameAutosaveName = "WhippetSessionPanel"
 
-    /// The database manager used to create the view model.
     private var databaseManager: DatabaseManager?
+
+    /// Called when the user clicks the gear icon. AppDelegate wires this to open settings.
+    var onSettingsRequested: (() -> Void)?
 
     // MARK: - Initialization
 
@@ -34,8 +24,6 @@ final class SessionPanelController {
 
     // MARK: - Configuration
 
-    /// Sets the database manager and creates the view model.
-    /// Must be called before the panel is shown for session data to appear.
     func setDatabaseManager(_ databaseManager: DatabaseManager) {
         self.databaseManager = databaseManager
         self.viewModel = SessionListViewModel(databaseManager: databaseManager)
@@ -43,88 +31,116 @@ final class SessionPanelController {
 
     // MARK: - Panel Creation
 
-    /// Creates the panel if it hasn't been created yet.
-    /// The panel is created lazily on first toggle to avoid creating
-    /// windows during app launch when they may not be needed.
     private func createPanelIfNeeded() {
         guard panel == nil else { return }
 
-        let defaultFrame = NSRect(x: 0, y: 0, width: 400, height: 500)
-        let sessionPanel = SessionPanel(contentRect: defaultFrame)
-
-        // Host the SwiftUI content with the view model
         guard let viewModel = viewModel else {
-            NSLog("Whippet: Warning - SessionPanelController creating panel without database manager; call setDatabaseManager first")
+            Log.ui.warning("Creating panel without database manager — call setDatabaseManager first")
             return
         }
+        Log.ui.debug("Creating session panel")
+
+        let defaultFrame = NSRect(x: 0, y: 0, width: 340, height: 300)
+        let sessionPanel = SessionPanel(contentRect: defaultFrame)
+
         let contentView = SessionContentView(viewModel: viewModel)
+        let hosting = NSHostingController(rootView: contentView)
+        // Let the hosting view size itself to the SwiftUI content
+        hosting.sizingOptions = [.preferredContentSize]
+        sessionPanel.contentView = hosting.view
+        hostingController = hosting
 
-        let hostingController = NSHostingController(rootView: contentView)
-        sessionPanel.contentView = hostingController.view
+        // Wire callbacks
+        sessionPanel.onCloseButtonPressed = { [weak self] in
+            self?.promptQuit()
+        }
+        sessionPanel.onSettingsButtonPressed = { [weak self] in
+            self?.onSettingsRequested?()
+        }
 
-        // Restore saved frame or center the panel
-        if let savedFrame = savedFrameFromDefaults() {
-            sessionPanel.setFrame(savedFrame, display: false)
-        } else {
+        // Set autosave name BEFORE restoring frame
+        sessionPanel.setFrameAutosaveName(Self.frameAutosaveName)
+
+        if !sessionPanel.setFrameUsingName(Self.frameAutosaveName) {
             sessionPanel.center()
         }
 
-        // Set up frame autosave so position persists across app launches
-        sessionPanel.setFrameAutosaveName(SessionPanelController.frameAutosaveName)
+        // Observe content size changes to resize the window to fit
+        hostingController?.view.setContentHuggingPriority(.defaultHigh, for: .vertical)
 
         panel = sessionPanel
     }
 
     // MARK: - Visibility
 
-    /// Whether the panel is currently visible.
     var isVisible: Bool {
         panel?.isVisible ?? false
     }
 
-    /// Toggles the panel visibility. Shows the panel if hidden, hides it if visible.
     func togglePanel() {
-        createPanelIfNeeded()
-
-        guard let panel = panel else { return }
-
-        if panel.isVisible {
+        if isVisible {
             hidePanel()
         } else {
             showPanel()
         }
     }
 
-    /// Shows the panel, restoring its previous position if available.
     func showPanel() {
         createPanelIfNeeded()
-
         guard let panel = panel else { return }
 
-        // Restore saved origin if we have one from a previous hide
-        if let origin = savedOrigin {
-            panel.setFrameOrigin(origin)
-        }
-
-        // Refresh session data when showing
         viewModel?.loadSessions()
-
+        sizeWindowToContent()
         panel.orderFront(nil)
+        Log.ui.debug("Panel shown")
     }
 
-    /// Hides the panel, saving its current position.
     func hidePanel() {
         guard let panel = panel else { return }
-
-        // Save position before hiding
-        savedOrigin = panel.frame.origin
-
+        panel.saveFrame(usingName: Self.frameAutosaveName)
         panel.orderOut(nil)
+        Log.ui.debug("Panel hidden")
+    }
+
+    // MARK: - Size to Content
+
+    /// Resizes the window height to fit the SwiftUI content, keeping the current width and position.
+    func sizeWindowToContent() {
+        guard let panel = panel, let hosting = hostingController else { return }
+
+        let fittingSize = hosting.view.fittingSize
+        let currentFrame = panel.frame
+
+        // Keep the current width (user may have resized), adjust height to content
+        let newHeight = max(fittingSize.height + panel.titlebarHeight, panel.minSize.height)
+        let newFrame = NSRect(
+            x: currentFrame.origin.x,
+            y: currentFrame.origin.y + currentFrame.height - newHeight,
+            width: currentFrame.width,
+            height: newHeight
+        )
+        panel.setFrame(newFrame, display: true, animate: false)
+    }
+
+    // MARK: - Quit Confirmation
+
+    private func promptQuit() {
+        let alert = NSAlert()
+        alert.messageText = "Quit Whippet?"
+        alert.informativeText = "Whippet will stop monitoring Claude Code sessions."
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: "Quit")
+        alert.addButton(withTitle: "Cancel")
+
+        let response = alert.runModal()
+        if response == .alertFirstButtonReturn {
+            Log.app.info("User confirmed quit from close button")
+            NSApplication.shared.terminate(nil)
+        }
     }
 
     // MARK: - Configuration
 
-    /// Whether the panel floats above all other windows.
     var isFloating: Bool {
         get { panel?.isFloating ?? true }
         set {
@@ -133,7 +149,6 @@ final class SessionPanelController {
         }
     }
 
-    /// The panel's transparency (0.3...1.0).
     var transparency: CGFloat {
         get { panel?.transparency ?? 1.0 }
         set {
@@ -141,15 +156,15 @@ final class SessionPanelController {
             panel?.transparency = newValue
         }
     }
+}
 
-    // MARK: - Frame Persistence
+// MARK: - NSPanel Extension
 
-    /// Attempts to read a previously saved frame from UserDefaults.
-    private func savedFrameFromDefaults() -> NSRect? {
-        let key = "NSWindow Frame \(SessionPanelController.frameAutosaveName)"
-        guard let frameString = UserDefaults.standard.string(forKey: key) else {
-            return nil
-        }
-        return NSRectFromString(frameString) != .zero ? NSRectFromString(frameString) : nil
+private extension NSPanel {
+    /// The height of the title bar area.
+    var titlebarHeight: CGFloat {
+        contentRect(forFrameRect: frame).height < frame.height
+            ? frame.height - contentRect(forFrameRect: frame).height
+            : 22 // fallback
     }
 }

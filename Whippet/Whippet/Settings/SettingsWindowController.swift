@@ -64,7 +64,7 @@ final class SettingsWindowController {
         let hostingController = NSHostingController(rootView: settingsView)
 
         let settingsWindow = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 500),
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 480),
             styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
@@ -74,7 +74,7 @@ final class SettingsWindowController {
         settingsWindow.center()
         settingsWindow.isReleasedWhenClosed = false
         settingsWindow.setFrameAutosaveName("WhippetSettingsWindow")
-        settingsWindow.minSize = NSSize(width: 420, height: 400)
+        settingsWindow.minSize = NSSize(width: 550, height: 420)
 
         self.window = settingsWindow
         settingsWindow.makeKeyAndOrderFront(nil)

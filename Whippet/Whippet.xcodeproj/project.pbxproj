@@ -37,6 +37,10 @@
 		A100010C /* NotificationManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000029 /* NotificationManagerTests.swift */; };
 		A100010D /* LaunchAtLoginManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100003B /* LaunchAtLoginManager.swift */; };
 		A100010E /* LaunchAtLoginManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100002A /* LaunchAtLoginManagerTests.swift */; };
+		A100010F /* Log.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100003C /* Log.swift */; };
+		A1000110 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100003D /* main.swift */; };
+		A1000111 /* GitMetadataResolver.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100003E /* GitMetadataResolver.swift */; };
+		A1000112 /* IngestionIntegrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A100002B /* IngestionIntegrationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -56,32 +60,36 @@
 		A1000013 /* Whippet.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Whippet.entitlements; sourceTree = "<group>"; };
 		A1000014 /* DatabaseManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManager.swift; sourceTree = "<group>"; };
 		A1000015 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
-		A1000020 /* WhippetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhippetTests.swift; sourceTree = "<group>"; };
-		A1000021 /* DatabaseManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManagerTests.swift; sourceTree = "<group>"; };
 		A1000016 /* EventIngestionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventIngestionManager.swift; sourceTree = "<group>"; };
 		A1000017 /* EventFile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventFile.swift; sourceTree = "<group>"; };
-		A1000022 /* EventIngestionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventIngestionManagerTests.swift; sourceTree = "<group>"; };
 		A1000018 /* HookInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookInstaller.swift; sourceTree = "<group>"; };
+		A1000020 /* WhippetTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WhippetTests.swift; sourceTree = "<group>"; };
+		A1000021 /* DatabaseManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DatabaseManagerTests.swift; sourceTree = "<group>"; };
+		A1000022 /* EventIngestionManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventIngestionManagerTests.swift; sourceTree = "<group>"; };
 		A1000023 /* HookInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookInstallerTests.swift; sourceTree = "<group>"; };
 		A1000024 /* SessionPanelControllerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPanelControllerTests.swift; sourceTree = "<group>"; };
 		A1000025 /* SessionListViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListViewModelTests.swift; sourceTree = "<group>"; };
+		A1000026 /* SessionLivenessMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLivenessMonitorTests.swift; sourceTree = "<group>"; };
+		A1000027 /* SessionActionHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionActionHandlerTests.swift; sourceTree = "<group>"; };
+		A1000028 /* SettingsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModelTests.swift; sourceTree = "<group>"; };
+		A1000029 /* NotificationManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManagerTests.swift; sourceTree = "<group>"; };
+		A100002A /* LaunchAtLoginManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginManagerTests.swift; sourceTree = "<group>"; };
 		A1000030 /* SessionPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPanel.swift; sourceTree = "<group>"; };
 		A1000031 /* SessionContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionContentView.swift; sourceTree = "<group>"; };
 		A1000032 /* SessionPanelController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionPanelController.swift; sourceTree = "<group>"; };
 		A1000033 /* SessionListViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionListViewModel.swift; sourceTree = "<group>"; };
 		A1000034 /* SessionLivenessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLivenessMonitor.swift; sourceTree = "<group>"; };
-		A1000026 /* SessionLivenessMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionLivenessMonitorTests.swift; sourceTree = "<group>"; };
-		A1000027 /* SessionActionHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionActionHandlerTests.swift; sourceTree = "<group>"; };
 		A1000035 /* SessionClickAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionClickAction.swift; sourceTree = "<group>"; };
 		A1000036 /* SessionActionHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionActionHandler.swift; sourceTree = "<group>"; };
 		A1000037 /* SettingsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModel.swift; sourceTree = "<group>"; };
 		A1000038 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1000039 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
-		A1000028 /* SettingsViewModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsViewModelTests.swift; sourceTree = "<group>"; };
-		A1000029 /* NotificationManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManagerTests.swift; sourceTree = "<group>"; };
 		A100003A /* NotificationManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationManager.swift; sourceTree = "<group>"; };
 		A100003B /* LaunchAtLoginManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginManager.swift; sourceTree = "<group>"; };
-		A100002A /* LaunchAtLoginManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchAtLoginManagerTests.swift; sourceTree = "<group>"; };
+		A100003C /* Log.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Log.swift; sourceTree = "<group>"; };
+		A100003D /* main.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = main.swift; sourceTree = "<group>"; };
+		A100003E /* GitMetadataResolver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GitMetadataResolver.swift; sourceTree = "<group>"; };
+		A100002B /* IngestionIntegrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IngestionIntegrationTests.swift; sourceTree = "<group>"; };
 		A1000051 /* Whippet.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Whippet.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000061 /* WhippetTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = WhippetTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
@@ -117,6 +125,8 @@
 			isa = PBXGroup;
 			children = (
 				A1000010 /* AppDelegate.swift */,
+				A100003C /* Log.swift */,
+				A100003D /* main.swift */,
 				A1000088 /* Actions */,
 				A1000084 /* Database */,
 				A1000086 /* Hooks */,
@@ -139,6 +149,7 @@
 				A1000022 /* EventIngestionManagerTests.swift */,
 				A1000023 /* HookInstallerTests.swift */,
 				A100002A /* LaunchAtLoginManagerTests.swift */,
+				A100002B /* IngestionIntegrationTests.swift */,
 				A1000024 /* SessionPanelControllerTests.swift */,
 				A1000025 /* SessionListViewModelTests.swift */,
 				A1000026 /* SessionLivenessMonitorTests.swift */,
@@ -147,6 +158,15 @@
 				A1000029 /* NotificationManagerTests.swift */,
 			);
 			path = WhippetTests;
+			sourceTree = "<group>";
+		};
+		A1000083 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A1000051 /* Whippet.app */,
+				A1000061 /* WhippetTests.xctest */,
+			);
+			name = Products;
 			sourceTree = "<group>";
 		};
 		A1000084 /* Database */ = {
@@ -163,6 +183,7 @@
 			children = (
 				A1000016 /* EventIngestionManager.swift */,
 				A1000017 /* EventFile.swift */,
+				A100003E /* GitMetadataResolver.swift */,
 				A1000034 /* SessionLivenessMonitor.swift */,
 			);
 			path = Ingestion;
@@ -176,6 +197,17 @@
 			path = Hooks;
 			sourceTree = "<group>";
 		};
+		A1000087 /* Window */ = {
+			isa = PBXGroup;
+			children = (
+				A1000030 /* SessionPanel.swift */,
+				A1000031 /* SessionContentView.swift */,
+				A1000032 /* SessionPanelController.swift */,
+				A1000033 /* SessionListViewModel.swift */,
+			);
+			path = Window;
+			sourceTree = "<group>";
+		};
 		A1000088 /* Actions */ = {
 			isa = PBXGroup;
 			children = (
@@ -183,14 +215,6 @@
 				A1000036 /* SessionActionHandler.swift */,
 			);
 			path = Actions;
-			sourceTree = "<group>";
-		};
-		A100008A /* Notifications */ = {
-			isa = PBXGroup;
-			children = (
-				A100003A /* NotificationManager.swift */,
-			);
-			path = Notifications;
 			sourceTree = "<group>";
 		};
 		A1000089 /* Settings */ = {
@@ -204,24 +228,12 @@
 			path = Settings;
 			sourceTree = "<group>";
 		};
-		A1000087 /* Window */ = {
+		A100008A /* Notifications */ = {
 			isa = PBXGroup;
 			children = (
-				A1000030 /* SessionPanel.swift */,
-				A1000031 /* SessionContentView.swift */,
-				A1000032 /* SessionPanelController.swift */,
-				A1000033 /* SessionListViewModel.swift */,
+				A100003A /* NotificationManager.swift */,
 			);
-			path = Window;
-			sourceTree = "<group>";
-		};
-		A1000083 /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				A1000051 /* Whippet.app */,
-				A1000061 /* WhippetTests.xctest */,
-			);
-			name = Products;
+			path = Notifications;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -333,6 +345,9 @@
 				A1000109 /* SettingsWindowController.swift in Sources */,
 				A100010B /* NotificationManager.swift in Sources */,
 				A100010D /* LaunchAtLoginManager.swift in Sources */,
+				A100010F /* Log.swift in Sources */,
+				A1000110 /* main.swift in Sources */,
+				A1000111 /* GitMetadataResolver.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -351,6 +366,7 @@
 				A100010A /* SettingsViewModelTests.swift in Sources */,
 				A100010C /* NotificationManagerTests.swift in Sources */,
 				A100010E /* LaunchAtLoginManagerTests.swift in Sources */,
+				A1000112 /* IngestionIntegrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -498,6 +514,8 @@
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikefullerton.Whippet;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_SWIFT_SYMBOLS = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -520,6 +538,8 @@
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.mikefullerton.Whippet;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				STRIP_INSTALLED_PRODUCT = NO;
+				STRIP_SWIFT_SYMBOLS = NO;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 			};
@@ -590,7 +610,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
 	};
 	rootObject = A1000099 /* Project object */;
 }

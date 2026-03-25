@@ -42,8 +42,10 @@ final class SessionActionHandlerTests: XCTestCase {
 
     func testAllActionCasesExist() {
         let allCases = SessionClickAction.allCases
-        XCTAssertEqual(allCases.count, 5)
+        XCTAssertEqual(allCases.count, 7)
         XCTAssertTrue(allCases.contains(.openTerminal))
+        XCTAssertTrue(allCases.contains(.activateWarp))
+        XCTAssertTrue(allCases.contains(.activateWindow))
         XCTAssertTrue(allCases.contains(.openTranscript))
         XCTAssertTrue(allCases.contains(.copySessionId))
         XCTAssertTrue(allCases.contains(.customCommand))
@@ -52,6 +54,8 @@ final class SessionActionHandlerTests: XCTestCase {
 
     func testActionRawValues() {
         XCTAssertEqual(SessionClickAction.openTerminal.rawValue, "open_terminal")
+        XCTAssertEqual(SessionClickAction.activateWarp.rawValue, "activate_warp")
+        XCTAssertEqual(SessionClickAction.activateWindow.rawValue, "activate_window")
         XCTAssertEqual(SessionClickAction.openTranscript.rawValue, "open_transcript")
         XCTAssertEqual(SessionClickAction.copySessionId.rawValue, "copy_session_id")
         XCTAssertEqual(SessionClickAction.customCommand.rawValue, "custom_command")
@@ -60,6 +64,8 @@ final class SessionActionHandlerTests: XCTestCase {
 
     func testActionDisplayNames() {
         XCTAssertEqual(SessionClickAction.openTerminal.displayName, "Open Terminal")
+        XCTAssertEqual(SessionClickAction.activateWarp.displayName, "Activate in Warp")
+        XCTAssertEqual(SessionClickAction.activateWindow.displayName, "Activate Window")
         XCTAssertEqual(SessionClickAction.openTranscript.displayName, "Open Transcript")
         XCTAssertEqual(SessionClickAction.copySessionId.displayName, "Copy Session ID")
         XCTAssertEqual(SessionClickAction.customCommand.displayName, "Run Custom Command")
@@ -121,7 +127,8 @@ final class SessionActionHandlerTests: XCTestCase {
         let session = makeSession()
         let template = "echo $SESSION_ID at $CWD using $MODEL"
         let result = handler.substituteVariables(in: template, session: session)
-        XCTAssertEqual(result, "echo test-session-123 at /Users/test/projects/MyApp using claude-3-opus")
+        // Values are shell-escaped with single quotes for injection protection
+        XCTAssertEqual(result, "echo 'test-session-123' at '/Users/test/projects/MyApp' using 'claude-3-opus'")
     }
 
     func testVariableSubstitutionWithNoVariables() {
@@ -135,14 +142,14 @@ final class SessionActionHandlerTests: XCTestCase {
         let session = makeSession(cwd: "", model: "")
         let template = "echo $SESSION_ID $CWD $MODEL"
         let result = handler.substituteVariables(in: template, session: session)
-        XCTAssertEqual(result, "echo test-session-123  ")
+        XCTAssertEqual(result, "echo 'test-session-123' '' ''")
     }
 
     func testVariableSubstitutionMultipleOccurrences() {
         let session = makeSession(sessionId: "abc")
         let template = "$SESSION_ID-$SESSION_ID"
         let result = handler.substituteVariables(in: template, session: session)
-        XCTAssertEqual(result, "abc-abc")
+        XCTAssertEqual(result, "'abc'-'abc'")
     }
 
     // MARK: - Copy Session ID Tests
@@ -171,8 +178,15 @@ final class SessionActionHandlerTests: XCTestCase {
         let session = makeSession(sessionId: "cmd-test-789")
         let result = handler.execute(action: .customCommand, for: session)
 
+        // Command runs async on background queue; execute returns .success immediately
         switch result {
         case .success:
+            // Wait briefly for background command to complete
+            let expectation = XCTestExpectation(description: "Command writes file")
+            DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
+                expectation.fulfill()
+            }
+            wait(for: [expectation], timeout: 3.0)
             let content = try String(contentsOfFile: tempFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
             XCTAssertEqual(content, "cmd-test-789")
         case .failure(let error):
@@ -184,12 +198,18 @@ final class SessionActionHandlerTests: XCTestCase {
         let tempFile = NSTemporaryDirectory() + "whippet_cmd_test_\(UUID().uuidString).txt"
         defer { try? FileManager.default.removeItem(atPath: tempFile) }
 
-        try handler.setCustomCommandTemplate("echo '$SESSION_ID $CWD $MODEL' > \(tempFile)")
+        // Template wraps vars in literal single quotes; substituteVariables also adds shell escaping
+        try handler.setCustomCommandTemplate("echo $SESSION_ID $CWD $MODEL > \(tempFile)")
         let session = makeSession()
         let result = handler.execute(action: .customCommand, for: session)
 
         switch result {
         case .success:
+            let expectation = XCTestExpectation(description: "Command writes file")
+            DispatchQueue.global().asyncAfter(deadline: .now() + 1.0) {
+                expectation.fulfill()
+            }
+            wait(for: [expectation], timeout: 3.0)
             let content = try String(contentsOfFile: tempFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines)
             XCTAssertEqual(content, "test-session-123 /Users/test/projects/MyApp claude-3-opus")
         case .failure(let error):
@@ -197,16 +217,18 @@ final class SessionActionHandlerTests: XCTestCase {
         }
     }
 
-    func testCustomCommandFailure() throws {
+    func testCustomCommandFailureReturnsSuccessAsync() throws {
+        // Since custom commands now run async, execute always returns .success
+        // Failures are logged but not returned synchronously
         try handler.setCustomCommandTemplate("exit 1")
         let session = makeSession()
         let result = handler.execute(action: .customCommand, for: session)
 
         switch result {
         case .success:
-            XCTFail("Command should have failed")
-        case .failure(let error):
-            XCTAssertTrue(error.localizedDescription.contains("Exit code"))
+            break // Expected — command runs async
+        case .failure:
+            XCTFail("Custom command should return success (runs async)")
         }
     }
 

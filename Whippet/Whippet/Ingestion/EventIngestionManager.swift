@@ -100,14 +100,14 @@ final class EventIngestionManager {
         startWatching()
 
         isRunning = true
-        NSLog("Whippet: EventIngestionManager started watching \(dropDirectoryURL.path)")
+        Log.ingestion.info("Started watching \(self.dropDirectoryURL.path, privacy: .public)")
     }
 
     /// Stops watching the drop directory.
     func stop() {
         stopWatching()
         isRunning = false
-        NSLog("Whippet: EventIngestionManager stopped")
+        Log.ingestion.info("Stopped")
     }
 
     // MARK: - File System Watching
@@ -115,7 +115,7 @@ final class EventIngestionManager {
     private func startWatching() {
         let fd = open(dropDirectoryURL.path, O_EVTONLY)
         guard fd >= 0 else {
-            NSLog("Whippet: Failed to open directory for monitoring: \(dropDirectoryURL.path)")
+            Log.ingestion.error("Failed to open directory for monitoring: \(self.dropDirectoryURL.path, privacy: .public)")
             return
         }
         directoryFileDescriptor = fd
@@ -127,9 +127,13 @@ final class EventIngestionManager {
         )
 
         source.setEventHandler { [weak self] in
-            // Delay slightly to allow files to finish writing and age past minimumFileAge
-            self?.processingQueue.asyncAfter(deadline: .now() + Self.minimumFileAge + 0.05) {
-                self?.processExistingFiles()
+            // Coalesce: delay to let files finish writing, then process the whole batch.
+            // Suspend the source during processing to avoid re-triggering from our own deletes.
+            self?.processingQueue.asyncAfter(deadline: .now() + 0.3) {
+                guard let self = self else { return }
+                self.directorySource?.suspend()
+                self.processExistingFiles()
+                self.directorySource?.resume()
             }
         }
 
@@ -166,6 +170,10 @@ final class EventIngestionManager {
         let jsonFiles = contents.filter { $0.pathExtension == "json" }
             .sorted { $0.lastPathComponent < $1.lastPathComponent }
 
+        if !jsonFiles.isEmpty {
+            Log.ingestion.debug("Found \(jsonFiles.count) JSON file(s) to process")
+        }
+
         for fileURL in jsonFiles {
             processFile(at: fileURL)
         }
@@ -193,19 +201,26 @@ final class EventIngestionManager {
 
         // Read the file contents
         guard let data = try? Data(contentsOf: fileURL) else {
-            NSLog("Whippet: Failed to read file: \(fileURL.lastPathComponent)")
+            Log.ingestion.warning("Failed to read file: \(fileURL.lastPathComponent, privacy: .public)")
             moveToErrors(fileURL)
             return
         }
 
-        // Ignore empty files (still being written)
+        // Empty files: if old enough, delete them (failed hook writes).
+        // If very recent, skip — the hook may still be writing.
         if data.isEmpty {
+            if let attributes = try? fm.attributesOfItem(atPath: fileURL.path),
+               let modDate = attributes[.modificationDate] as? Date,
+               Date().timeIntervalSince(modDate) > 5.0 {
+                Log.ingestion.debug("Deleting empty file: \(fileURL.lastPathComponent, privacy: .public)")
+                try? fm.removeItem(at: fileURL)
+            }
             return
         }
 
         // Parse JSON
         guard let eventFile = parseEventFile(data: data, fileName: fileURL.lastPathComponent) else {
-            NSLog("Whippet: Malformed JSON in file: \(fileURL.lastPathComponent)")
+            Log.ingestion.warning("Malformed JSON in file: \(fileURL.lastPathComponent, privacy: .public)")
             moveToErrors(fileURL)
             return
         }
@@ -215,8 +230,9 @@ final class EventIngestionManager {
             try ingestEvent(eventFile, rawData: data)
             // Delete the consumed file
             try fm.removeItem(at: fileURL)
+            Log.ingestion.debug("Ingested \(eventFile.event, privacy: .public) for session \(eventFile.sessionId, privacy: .public) from \(fileURL.lastPathComponent, privacy: .public)")
         } catch {
-            NSLog("Whippet: Failed to ingest event from \(fileURL.lastPathComponent): \(error.localizedDescription)")
+            Log.ingestion.error("Failed to ingest event from \(fileURL.lastPathComponent, privacy: .public): \(error.localizedDescription, privacy: .public)")
             moveToErrors(fileURL)
         }
     }
@@ -266,6 +282,12 @@ final class EventIngestionManager {
         )
         try databaseManager.insertEvent(event)
 
+        // If this is a UserPromptSubmit event, update the session summary
+        if eventFile.event == "UserPromptSubmit", let prompt = eventFile.data["prompt"] as? String, !prompt.isEmpty {
+            let truncated = String(prompt.prefix(120))
+            try? databaseManager.updateSessionSummary(sessionId: eventFile.sessionId, summary: truncated)
+        }
+
         // If this is a SessionEnd event, mark the session as ended
         if eventFile.event == "SessionEnd" {
             try databaseManager.updateSessionStatus(
@@ -284,6 +306,7 @@ final class EventIngestionManager {
         let cwd = eventFile.data["cwd"] as? String ?? ""
         let model = eventFile.data["model"] as? String ?? ""
         let lastTool = eventFile.data["tool"] as? String ?? ""
+        let gitBranch = cwd.isEmpty ? "" : GitMetadataResolver.shared.resolveBranch(cwd: cwd)
 
         let status: SessionStatus = eventFile.event == "SessionEnd" ? .ended : .active
 
@@ -294,7 +317,8 @@ final class EventIngestionManager {
             startedAt: eventFile.event == "SessionStart" ? eventFile.timestamp : "",
             lastActivityAt: eventFile.timestamp,
             lastTool: lastTool,
-            status: status
+            status: status,
+            gitBranch: gitBranch
         )
     }
 
@@ -312,9 +336,9 @@ final class EventIngestionManager {
                 try fm.removeItem(at: destination)
             }
             try fm.moveItem(at: fileURL, to: destination)
-            NSLog("Whippet: Moved malformed file to errors: \(fileURL.lastPathComponent)")
+            Log.ingestion.info("Moved malformed file to errors/: \(fileURL.lastPathComponent, privacy: .public)")
         } catch {
-            NSLog("Whippet: Failed to move file to errors directory: \(error.localizedDescription)")
+            Log.ingestion.error("Failed to move file to errors directory: \(error.localizedDescription, privacy: .public)")
             // Last resort: try to delete the problematic file
             try? fm.removeItem(at: fileURL)
         }

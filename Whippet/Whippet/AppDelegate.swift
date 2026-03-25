@@ -1,6 +1,5 @@
 import AppKit
 
-@main
 class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var statusItem: NSStatusItem!
@@ -15,6 +14,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - App Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Log.app.info("Whippet launching")
         setupMenuBar()
         setupDatabase()
         setupPanelController()
@@ -23,11 +23,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupNotifications()
         setupIngestion()
         setupLivenessMonitor()
+        panelController.showPanel()
+        Log.app.info("Whippet launch complete — all subsystems initialized")
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        Log.app.info("Whippet terminating")
         livenessMonitor?.stop()
         ingestionManager?.stop()
+        Log.app.info("Whippet shutdown complete")
     }
 
     // MARK: - Database
@@ -35,9 +39,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupDatabase() {
         do {
             databaseManager = try DatabaseManager()
-            NSLog("Whippet: Database initialized")
+            Log.app.info("Database initialized")
         } catch {
-            NSLog("Whippet: Failed to initialize database: \(error.localizedDescription)")
+            Log.app.error("Failed to initialize database: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -45,34 +49,49 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupPanelController() {
         guard let db = databaseManager else {
-            NSLog("Whippet: Cannot setup panel controller without database")
+            Log.app.warning("Cannot setup panel controller — no database")
             return
         }
         panelController.setDatabaseManager(db)
+        panelController.onSettingsRequested = { [weak self] in
+            self?.settingsController.showSettings()
+        }
+        Log.app.debug("Panel controller configured")
     }
 
     // MARK: - Settings Controller
 
     private func setupSettingsController() {
         guard let db = databaseManager else {
-            NSLog("Whippet: Cannot setup settings controller without database")
+            Log.app.warning("Cannot setup settings controller — no database")
             return
         }
         settingsController.configure(databaseManager: db, panelController: panelController)
+
+        // Apply saved appearance mode
+        if let mode = try? db.getSetting(key: SettingsViewModel.appearanceModeKey) {
+            applyAppearanceMode(mode)
+        }
+
+        Log.app.debug("Settings controller configured")
     }
 
     // MARK: - Hooks
 
     private func installHooksIfNeeded() {
         hookInstaller = HookInstaller()
-        let result = hookInstaller?.installHooks() ?? .failed("HookInstaller not created")
+        guard let installer = hookInstaller else { return }
+
+        // Always reinstall to pick up hook command updates
+        _ = installer.uninstallHooks()
+        let result = installer.installHooks()
         switch result {
         case .installed:
-            NSLog("Whippet: Hooks installed successfully")
+            Log.app.info("Hooks installed successfully")
         case .alreadyInstalled:
-            NSLog("Whippet: Hooks already installed, skipping")
+            Log.app.info("Hooks already installed")
         case .failed(let error):
-            NSLog("Whippet: Hook installation failed: \(error)")
+            Log.app.error("Hook installation failed: \(error, privacy: .public)")
         }
     }
 
@@ -80,7 +99,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupNotifications() {
         guard let db = databaseManager else {
-            NSLog("Whippet: Cannot setup notifications without database")
+            Log.app.warning("Cannot setup notifications — no database")
             return
         }
 
@@ -91,13 +110,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         notificationManager?.onNotificationClicked = { [weak self] in
             self?.panelController.showPanel()
         }
+        Log.app.debug("Notification manager configured")
     }
 
     // MARK: - Ingestion
 
     private func setupIngestion() {
         guard let db = databaseManager else {
-            NSLog("Whippet: Cannot start ingestion without database")
+            Log.app.warning("Cannot start ingestion — no database")
             return
         }
 
@@ -119,7 +139,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         do {
             try ingestionManager?.start()
         } catch {
-            NSLog("Whippet: Failed to start event ingestion: \(error.localizedDescription)")
+            Log.app.error("Failed to start event ingestion: \(error.localizedDescription, privacy: .public)")
         }
     }
 
@@ -127,7 +147,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setupLivenessMonitor() {
         guard let db = databaseManager else {
-            NSLog("Whippet: Cannot start liveness monitor without database")
+            Log.app.warning("Cannot start liveness monitor — no database")
             return
         }
 
@@ -158,7 +178,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
         menu.addItem(NSMenuItem.separator())
         menu.addItem(
-            NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: ",")
+            NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: "")
         )
         menu.addItem(NSMenuItem.separator())
         menu.addItem(
@@ -166,19 +186,37 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         )
 
         statusItem.menu = menu
+        Log.app.debug("Menu bar configured")
     }
 
     // MARK: - Menu Actions
 
     @objc private func showSessions() {
+        Log.ui.debug("Menu action: Show Sessions")
         panelController.togglePanel()
     }
 
     @objc private func openSettings() {
+        Log.ui.debug("Menu action: Settings")
         settingsController.showSettings()
     }
 
     @objc private func quitApp() {
+        Log.app.info("Menu action: Quit")
         NSApplication.shared.terminate(nil)
+    }
+
+    // MARK: - Appearance
+
+    private func applyAppearanceMode(_ mode: String) {
+        switch mode {
+        case "light":
+            NSApp.appearance = NSAppearance(named: .aqua)
+        case "dark":
+            NSApp.appearance = NSAppearance(named: .darkAqua)
+        default:
+            NSApp.appearance = nil
+        }
+        Log.app.info("Appearance mode: \(mode, privacy: .public)")
     }
 }

@@ -1,204 +1,225 @@
 import SwiftUI
 
-/// The main SwiftUI view displayed inside the floating session panel.
-///
-/// Shows sessions grouped by project with collapsible sections, real-time updates,
-/// and visual status indicators. Displays an empty state when no sessions exist.
+/// The main SwiftUI view displayed inside the floating session palette.
 struct SessionContentView: View {
     @ObservedObject var viewModel: SessionListViewModel
 
     var body: some View {
         VStack(spacing: 0) {
-            Group {
-                if viewModel.isEmpty {
-                    emptyState
-                } else {
-                    sessionList
-                }
+            if viewModel.isEmpty {
+                emptyState
+            } else {
+                sessionList
             }
 
             // Error banner for failed click actions
             if let error = viewModel.lastActionError {
-                HStack(spacing: 6) {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.yellow)
-                    Text(error)
-                        .font(.caption)
-                        .lineLimit(2)
-                    Spacer()
+                VStack(spacing: 4) {
+                    HStack(spacing: 6) {
+                        Image(systemName: viewModel.lastPermissionPane != nil
+                              ? "lock.shield" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(.yellow)
+                        Text(error)
+                            .font(.system(size: 11))
+                            .lineLimit(3)
+                            .fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                    }
+
+                    if viewModel.lastPermissionPane != nil {
+                        Button(action: { viewModel.openPermissionSettings() }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "gear")
+                                Text("Open System Settings")
+                            }
+                            .font(.system(size: 11, weight: .medium))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4)
+                            .background(.white.opacity(0.1))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .padding(.horizontal, 12)
+                .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                .background(.red.opacity(0.15))
+                .background(viewModel.lastPermissionPane != nil
+                            ? Color.orange.opacity(0.15)
+                            : Color.red.opacity(0.15))
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .frame(minWidth: 320, minHeight: 200)
+        .frame(minWidth: 280)
         .animation(.easeInOut(duration: 0.2), value: viewModel.lastActionError)
     }
 
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 8) {
             Image(systemName: "dog.fill")
-                .font(.system(size: 32))
+                .font(.system(size: 24))
                 .foregroundStyle(.secondary)
 
-            Text("No Sessions")
-                .font(.headline)
-
-            Text("Start a Claude Code session to see it here.")
-                .font(.subheadline)
+            Text("No Active Sessions")
+                .font(.system(size: 12, weight: .medium))
                 .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding()
     }
 
     // MARK: - Session List
 
     private var sessionList: some View {
         VStack(spacing: 0) {
-            // Header
-            sessionListHeader
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
+            // Compact header
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(.green)
+                    .frame(width: 6, height: 6)
+                    .opacity(viewModel.activeSessionCount > 0 ? 1 : 0)
 
-            Divider()
+                Text("\(viewModel.sessionCount) session\(viewModel.sessionCount == 1 ? "" : "s")")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
 
-            // Grouped session list
+                if viewModel.activeSessionCount > 0 {
+                    Text("\(viewModel.activeSessionCount) active")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(.green)
+                }
+
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+
+            Divider().opacity(0.3)
+
             ScrollView {
-                LazyVStack(spacing: 0, pinnedViews: [.sectionHeaders]) {
+                VStack(spacing: 10) {
                     ForEach(viewModel.groups) { group in
                         SessionGroupView(group: group, onSessionClick: viewModel.handleSessionClick)
                     }
                 }
+                .padding(8)
             }
-        }
-    }
-
-    private var sessionListHeader: some View {
-        HStack {
-            Text("\(viewModel.sessionCount) session\(viewModel.sessionCount == 1 ? "" : "s")")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-
-            if viewModel.activeSessionCount > 0 {
-                Text("\(viewModel.activeSessionCount) active")
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.green)
-            }
-
-            Spacer()
         }
     }
 }
 
 // MARK: - Session Group View
 
-/// A collapsible section showing sessions for a single project.
+/// A visually separated card showing sessions for a single project.
+/// Shows "None" when the project has no active/stale sessions.
 struct SessionGroupView: View {
     let group: SessionGroup
     var onSessionClick: ((Session) -> Void)?
-    @State private var isExpanded = true
 
     var body: some View {
-        Section {
-            if isExpanded {
+        VStack(spacing: 0) {
+            // Header
+            HStack(spacing: 5) {
+                Circle()
+                    .fill(group.hasActiveSessions ? .green :
+                          group.hasStaleSessions ? .orange : .gray.opacity(0.4))
+                    .frame(width: 6, height: 6)
+
+                Text(group.projectName)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                if !group.abbreviatedPath.isEmpty {
+                    Text(group.abbreviatedPath)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+
+            Divider().opacity(0.15)
+
+            // Sessions
+            if group.sessions.isEmpty {
+                Text("None")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.tertiary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+            } else {
                 ForEach(group.sessions, id: \.sessionId) { session in
                     SessionRowView(session: session, onTap: onSessionClick)
                     if session.sessionId != group.sessions.last?.sessionId {
                         Divider()
-                            .padding(.leading, 12)
+                            .opacity(0.1)
+                            .padding(.leading, 24)
                     }
                 }
             }
-        } header: {
-            groupHeader
         }
-    }
-
-    private var groupHeader: some View {
-        Button(action: {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isExpanded.toggle()
-            }
-        }) {
-            HStack(spacing: 6) {
-                Image(systemName: isExpanded ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 12)
-
-                if group.hasActiveSessions {
-                    Circle()
-                        .fill(.green)
-                        .frame(width: 6, height: 6)
-                }
-
-                Text(group.projectName)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-
-                Text("(\(group.sessions.count))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(.quaternary.opacity(0.5))
-        }
-        .buttonStyle(.plain)
+        .background(.white.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(.white.opacity(0.08), lineWidth: 0.5)
+        )
     }
 }
 
 // MARK: - Session Row View
 
-/// Displays a single session with its status, metadata, and activity information.
 struct SessionRowView: View {
     let session: Session
     var onTap: ((Session) -> Void)?
     @State private var isHovered = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .center, spacing: 8) {
             statusIndicator
-                .padding(.top, 4)
 
-            VStack(alignment: .leading, spacing: 4) {
-                // Top line: working directory and model
+            VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text(session.cwd.isEmpty ? "Unknown" : abbreviatedPath(session.cwd))
-                        .font(.system(.body, design: .monospaced))
-                        .lineLimit(1)
-                        .truncationMode(.middle)
+                    // Primary label: branch, summary, or fallback
+                    if !session.gitBranch.isEmpty {
+                        Label(session.gitBranch, systemImage: "arrow.triangle.branch")
+                            .font(.system(size: 11))
+                            .lineLimit(1)
+                    } else {
+                        Text(session.displayLabel)
+                            .font(.system(size: 11))
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
 
                     Spacer()
 
                     if !session.model.isEmpty {
-                        Text(session.model)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 2)
-                            .background(.quaternary)
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                        Text(abbreviatedModel(session.model))
+                            .font(.system(size: 9))
+                            .foregroundStyle(.tertiary)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 1)
+                            .background(.white.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
                     }
                 }
 
-                // Bottom line: timestamps and last tool
-                HStack(spacing: 8) {
-                    Label(formatTimestamp(session.startedAt), systemImage: "clock")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-
-                    if !session.lastTool.isEmpty {
+                HStack(spacing: 6) {
+                    // Summary (user prompt) if we have branch + summary
+                    if !session.gitBranch.isEmpty && !session.summary.isEmpty {
+                        Text(session.summary)
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    } else if !session.lastTool.isEmpty {
                         Label(session.lastTool, systemImage: "wrench")
-                            .font(.caption)
+                            .font(.system(size: 10))
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
@@ -206,24 +227,18 @@ struct SessionRowView: View {
                     Spacer()
 
                     Text(relativeTime(session.lastActivityAt))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(.system(size: 10))
+                        .foregroundStyle(.tertiary)
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .contentShape(Rectangle())
-        .background(isHovered ? Color.primary.opacity(0.05) : Color.clear)
-        .onHover { hovering in
-            isHovered = hovering
-        }
-        .onTapGesture {
-            onTap?(session)
-        }
+        .background(isHovered ? Color.white.opacity(0.06) : Color.clear)
+        .onHover { isHovered = $0 }
+        .onTapGesture { onTap?(session) }
     }
-
-    // MARK: - Status Indicator
 
     private var statusIndicator: some View {
         Group {
@@ -231,22 +246,19 @@ struct SessionRowView: View {
             case .active:
                 Circle()
                     .fill(.green)
-                    .frame(width: 8, height: 8)
+                    .frame(width: 7, height: 7)
             case .stale:
                 Circle()
                     .fill(.orange)
-                    .frame(width: 8, height: 8)
+                    .frame(width: 7, height: 7)
             case .ended:
                 Circle()
-                    .strokeBorder(.secondary, lineWidth: 1)
-                    .frame(width: 8, height: 8)
+                    .strokeBorder(.secondary.opacity(0.5), lineWidth: 1)
+                    .frame(width: 7, height: 7)
             }
         }
     }
 
-    // MARK: - Formatting Helpers
-
-    /// Abbreviates a file path by replacing the home directory with ~.
     private func abbreviatedPath(_ path: String) -> String {
         let home = FileManager.default.homeDirectoryForCurrentUser.path
         if path.hasPrefix(home) {
@@ -255,62 +267,31 @@ struct SessionRowView: View {
         return path
     }
 
-    /// Formats an ISO 8601 timestamp into a short time string.
-    private func formatTimestamp(_ timestamp: String) -> String {
-        guard !timestamp.isEmpty else { return "Unknown" }
-
-        let formatter = ISO8601DateFormatter()
-        guard let date = formatter.date(from: timestamp) else {
-            // Try without fractional seconds
-            formatter.formatOptions.remove(.withFractionalSeconds)
-            guard let date = formatter.date(from: timestamp) else {
-                return timestamp
-            }
-            return formatDate(date)
-        }
-        return formatDate(date)
+    private func abbreviatedModel(_ model: String) -> String {
+        if model.contains("opus") { return "opus" }
+        if model.contains("sonnet") { return "sonnet" }
+        if model.contains("haiku") { return "haiku" }
+        return model.components(separatedBy: "-").prefix(2).joined(separator: "-")
     }
 
-    /// Formats a Date into a human-readable time.
-    private func formatDate(_ date: Date) -> String {
-        let displayFormatter = DateFormatter()
-        if Calendar.current.isDateInToday(date) {
-            displayFormatter.dateFormat = "h:mm a"
-        } else {
-            displayFormatter.dateFormat = "MMM d, h:mm a"
-        }
-        return displayFormatter.string(from: date)
-    }
-
-    /// Returns a relative time string like "2m ago" or "1h ago".
     private func relativeTime(_ timestamp: String) -> String {
         guard !timestamp.isEmpty else { return "" }
-
         let formatter = ISO8601DateFormatter()
-        guard let date = formatter.date(from: timestamp) else {
-            formatter.formatOptions.remove(.withFractionalSeconds)
-            guard let date = formatter.date(from: timestamp) else {
-                return ""
-            }
+        if let date = formatter.date(from: timestamp) {
             return relativeTimeFromDate(date)
         }
-        return relativeTimeFromDate(date)
+        formatter.formatOptions.remove(.withFractionalSeconds)
+        if let date = formatter.date(from: timestamp) {
+            return relativeTimeFromDate(date)
+        }
+        return ""
     }
 
     private func relativeTimeFromDate(_ date: Date) -> String {
         let interval = Date().timeIntervalSince(date)
-
-        if interval < 60 {
-            return "just now"
-        } else if interval < 3600 {
-            let minutes = Int(interval / 60)
-            return "\(minutes)m ago"
-        } else if interval < 86400 {
-            let hours = Int(interval / 3600)
-            return "\(hours)h ago"
-        } else {
-            let days = Int(interval / 86400)
-            return "\(days)d ago"
-        }
+        if interval < 60 { return "now" }
+        if interval < 3600 { return "\(Int(interval / 60))m" }
+        if interval < 86400 { return "\(Int(interval / 3600))h" }
+        return "\(Int(interval / 86400))d"
     }
 }

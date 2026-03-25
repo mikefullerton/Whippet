@@ -12,6 +12,8 @@ struct Session: Equatable {
     var lastActivityAt: String
     var lastTool: String
     var status: SessionStatus
+    var gitBranch: String
+    var summary: String
 
     init(
         id: Int? = nil,
@@ -21,7 +23,9 @@ struct Session: Equatable {
         startedAt: String = "",
         lastActivityAt: String = "",
         lastTool: String = "",
-        status: SessionStatus = .active
+        status: SessionStatus = .active,
+        gitBranch: String = "",
+        summary: String = ""
     ) {
         self.id = id
         self.sessionId = sessionId
@@ -31,9 +35,20 @@ struct Session: Equatable {
         self.lastActivityAt = lastActivityAt.isEmpty ? ISO8601DateFormatter().string(from: Date()) : lastActivityAt
         self.lastTool = lastTool
         self.status = status
+        self.gitBranch = gitBranch
+        self.summary = summary
     }
 
-    /// Derives the project name from the working directory path.
+    /// Returns the best available description for this session.
+    /// Priority: summary > gitBranch > last path component of cwd.
+    var displayLabel: String {
+        if !summary.isEmpty { return summary }
+        if !gitBranch.isEmpty { return gitBranch }
+        guard !cwd.isEmpty else { return "Unknown" }
+        return (cwd as NSString).lastPathComponent
+    }
+
+    /// Derives the project name from the last path component of the working directory.
     var projectName: String {
         guard !cwd.isEmpty else { return "Unknown" }
         return (cwd as NSString).lastPathComponent

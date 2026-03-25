@@ -69,9 +69,9 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         notificationCenter.requestAuthorization(options: [.alert, .sound]) { [weak self] granted, error in
             self?.isAuthorized = granted
             if let error = error {
-                NSLog("Whippet: Notification authorization error: \(error.localizedDescription)")
+                Log.notifications.error("Authorization error: \(error.localizedDescription, privacy: .public)")
             } else {
-                NSLog("Whippet: Notification authorization \(granted ? "granted" : "denied")")
+                Log.notifications.info("Authorization \(granted ? "granted" : "denied", privacy: .public)")
             }
         }
     }
@@ -178,6 +178,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         // Bring the floating window to the front
+        Log.notifications.debug("User clicked notification")
         DispatchQueue.main.async { [weak self] in
             self?.onNotificationClicked?()
         }
@@ -197,13 +198,14 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
                 return value == "true"
             }
         } catch {
-            NSLog("Whippet: Failed to read notification setting '\(key)': \(error.localizedDescription)")
+            Log.notifications.warning("Failed to read setting '\(key, privacy: .public)': \(error.localizedDescription, privacy: .public)")
         }
         return false
     }
 
     /// Posts a notification request with the given identifier and content.
     private func postNotification(identifier: String, content: UNNotificationContent) {
+        Log.notifications.debug("Posting notification: \(identifier, privacy: .public) — \(content.title, privacy: .public)")
         let request = UNNotificationRequest(
             identifier: identifier,
             content: content,
@@ -212,7 +214,7 @@ final class NotificationManager: NSObject, UNUserNotificationCenterDelegate {
 
         notificationCenter.add(request, withCompletionHandler: { error in
             if let error = error {
-                NSLog("Whippet: Failed to post notification: \(error.localizedDescription)")
+                Log.notifications.error("Failed to post notification '\(identifier, privacy: .public)': \(error.localizedDescription, privacy: .public)")
             }
         })
     }

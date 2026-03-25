@@ -1,6 +1,75 @@
 import Foundation
 import Combine
 
+/// Supported AI providers for session summarization.
+enum AIProvider: String, CaseIterable, Identifiable {
+    case anthropic
+    case openai
+    case google
+    case custom
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .anthropic: return "Anthropic (Claude)"
+        case .openai: return "OpenAI (ChatGPT)"
+        case .google: return "Google (Gemini)"
+        case .custom: return "Custom (OpenAI-compatible)"
+        }
+    }
+
+    /// Available models for each provider, cheapest first.
+    var defaultModels: [String] {
+        switch self {
+        case .anthropic: return ["claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250514", "claude-opus-4-5-20250514"]
+        case .openai: return ["gpt-4.1-nano", "gpt-4.1-mini", "gpt-4o-mini", "gpt-4o"]
+        case .google: return ["gemini-2.0-flash", "gemini-2.5-flash-preview-05-20", "gemini-2.5-pro-preview-05-06"]
+        case .custom: return []
+        }
+    }
+
+    /// The cheapest model that's good enough for short session summaries.
+    var recommendedModel: String {
+        switch self {
+        case .anthropic: return "claude-haiku-4-5-20251001"   // ~$0.80/M input, fast
+        case .openai: return "gpt-4.1-nano"                   // ~$0.10/M input, very cheap
+        case .google: return "gemini-2.0-flash"               // free tier available, fast
+        case .custom: return ""
+        }
+    }
+
+    /// Short cost/speed note for the recommended model.
+    var recommendedNote: String {
+        switch self {
+        case .anthropic: return "Haiku 4.5 — fast and inexpensive (~$0.80/M input tokens)"
+        case .openai: return "GPT-4.1 Nano — cheapest OpenAI model (~$0.10/M input tokens)"
+        case .google: return "Gemini 2.0 Flash — fast, free tier available"
+        case .custom: return ""
+        }
+    }
+
+    /// Placeholder text for the API key field.
+    var apiKeyPlaceholder: String {
+        switch self {
+        case .anthropic: return "sk-ant-..."
+        case .openai: return "sk-..."
+        case .google: return "AIza..."
+        case .custom: return "API key"
+        }
+    }
+
+    /// Default base URL for the provider's API.
+    var defaultBaseURL: String {
+        switch self {
+        case .anthropic: return "https://api.anthropic.com"
+        case .openai: return "https://api.openai.com"
+        case .google: return "https://generativelanguage.googleapis.com"
+        case .custom: return ""
+        }
+    }
+}
+
 /// View model for the Settings window. Reads and writes all configurable settings
 /// to the SQLite `settings` table via DatabaseManager. Changes are persisted
 /// immediately and take effect without requiring an app restart.
@@ -38,6 +107,27 @@ final class SettingsViewModel: ObservableObject {
     /// Key for the custom shell command template.
     static let customCommandKey = SessionActionHandler.customCommandKey
 
+    /// Key for the appearance mode ("light", "dark", "auto").
+    static let appearanceModeKey = "appearance_mode"
+
+    /// Key for the text size offset from system default.
+    static let textSizeKey = "text_size"
+
+    /// Key for the AI provider ("anthropic", "openai", "google", "custom").
+    static let aiProviderKey = "ai_provider"
+
+    /// Key for the AI model identifier (e.g. "claude-haiku-4-5-20251001", "gpt-4o-mini").
+    static let aiModelKey = "ai_model"
+
+    /// Key for the AI API key.
+    static let aiAPIKeyKey = "ai_api_key"
+
+    /// Key for a custom API base URL (for custom/self-hosted providers).
+    static let aiBaseURLKey = "ai_base_url"
+
+    /// Key for the AI summaries enabled toggle.
+    static let aiSummariesEnabledKey = "ai_summaries_enabled"
+
     // MARK: - Default Values
 
     static let defaultStalenessTimeout: Double = 60
@@ -49,6 +139,13 @@ final class SettingsViewModel: ObservableObject {
     static let defaultClickAction: SessionClickAction = .openTerminal
     static let defaultCustomCommand: String = "echo $SESSION_ID $CWD $MODEL"
     static let defaultLaunchAtLogin: Bool = false
+    static let defaultAppearanceMode: String = "auto"
+    static let defaultTextSize: Double = 0.0
+    static let defaultAIProvider: String = AIProvider.anthropic.rawValue
+    static let defaultAIModel: String = "claude-haiku-4-5-20251001"
+    static let defaultAIAPIKey: String = ""
+    static let defaultAIBaseURL: String = ""
+    static let defaultAISummariesEnabled: Bool = false
 
     // MARK: - Published Properties
 
@@ -123,6 +220,53 @@ final class SettingsViewModel: ObservableObject {
     /// Whether to show the first-launch prompt explaining launch-at-login.
     @Published var shouldShowLaunchAtLoginPrompt: Bool = false
 
+    /// Appearance mode: "light", "dark", or "auto".
+    @Published var appearanceMode: String = "auto" {
+        didSet {
+            saveSetting(key: Self.appearanceModeKey, value: appearanceMode)
+            onAppearanceModeChanged?(appearanceMode)
+        }
+    }
+
+    /// Text size offset from system default (range -4...4). 0.0 means system default.
+    @Published var textSize: Double = 0.0 {
+        didSet {
+            saveSetting(key: Self.textSizeKey, value: String(textSize))
+            onTextSizeChanged?(textSize)
+        }
+    }
+
+    /// The AI provider for session summaries.
+    @Published var aiProvider: AIProvider = .anthropic {
+        didSet {
+            saveSetting(key: Self.aiProviderKey, value: aiProvider.rawValue)
+            // Set a sensible default model when switching providers
+            if aiModel.isEmpty || !aiProvider.defaultModels.contains(aiModel) {
+                aiModel = aiProvider.defaultModels.first ?? ""
+            }
+        }
+    }
+
+    /// The AI model to use for summaries (e.g. "claude-haiku-4-5-20251001", "gpt-4o-mini").
+    @Published var aiModel: String = "claude-haiku-4-5-20251001" {
+        didSet { saveSetting(key: Self.aiModelKey, value: aiModel) }
+    }
+
+    /// API key for the selected AI provider.
+    @Published var aiAPIKey: String = "" {
+        didSet { saveSetting(key: Self.aiAPIKeyKey, value: aiAPIKey) }
+    }
+
+    /// Custom API base URL (only used when provider is .custom).
+    @Published var aiBaseURL: String = "" {
+        didSet { saveSetting(key: Self.aiBaseURLKey, value: aiBaseURL) }
+    }
+
+    /// Whether AI session summaries are enabled.
+    @Published var aiSummariesEnabled: Bool = false {
+        didSet { saveSetting(key: Self.aiSummariesEnabledKey, value: aiSummariesEnabled ? "true" : "false") }
+    }
+
     // MARK: - Callbacks
 
     /// Called when the always-on-top setting changes so the panel controller can update.
@@ -130,6 +274,12 @@ final class SettingsViewModel: ObservableObject {
 
     /// Called when the transparency setting changes so the panel controller can update.
     var onTransparencyChanged: ((CGFloat) -> Void)?
+
+    /// Called when the appearance mode changes so the app delegate can update NSApp.appearance.
+    var onAppearanceModeChanged: ((String) -> Void)?
+
+    /// Called when the text size changes.
+    var onTextSizeChanged: ((Double) -> Void)?
 
     // MARK: - Properties
 
@@ -158,6 +308,13 @@ final class SettingsViewModel: ObservableObject {
         self.clickAction = Self.defaultClickAction
         self.customCommand = Self.defaultCustomCommand
         self.launchAtLogin = Self.defaultLaunchAtLogin
+        self.appearanceMode = Self.defaultAppearanceMode
+        self.textSize = Self.defaultTextSize
+        self.aiProvider = AIProvider(rawValue: Self.defaultAIProvider) ?? .anthropic
+        self.aiModel = Self.defaultAIModel
+        self.aiAPIKey = Self.defaultAIAPIKey
+        self.aiBaseURL = Self.defaultAIBaseURL
+        self.aiSummariesEnabled = Self.defaultAISummariesEnabled
 
         loadFromDatabase()
     }
@@ -209,6 +366,34 @@ final class SettingsViewModel: ObservableObject {
 
             if let value = settings[Self.customCommandKey], !value.isEmpty {
                 customCommand = value
+            }
+
+            if let value = settings[Self.appearanceModeKey], ["light", "dark", "auto"].contains(value) {
+                appearanceMode = value
+            }
+
+            if let value = settings[Self.textSizeKey], let size = Double(value) {
+                textSize = min(max(size, -4), 4)
+            }
+
+            if let value = settings[Self.aiProviderKey], let provider = AIProvider(rawValue: value) {
+                aiProvider = provider
+            }
+
+            if let value = settings[Self.aiModelKey], !value.isEmpty {
+                aiModel = value
+            }
+
+            if let value = settings[Self.aiAPIKeyKey] {
+                aiAPIKey = value
+            }
+
+            if let value = settings[Self.aiBaseURLKey] {
+                aiBaseURL = value
+            }
+
+            if let value = settings[Self.aiSummariesEnabledKey] {
+                aiSummariesEnabled = value == "true"
             }
 
             // Launch at login reads the actual system state, not the database

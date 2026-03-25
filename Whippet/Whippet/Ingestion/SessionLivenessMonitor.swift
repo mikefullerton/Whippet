@@ -69,7 +69,7 @@ final class SessionLivenessMonitor {
         timer.resume()
         isRunning = true
 
-        NSLog("Whippet: SessionLivenessMonitor started (check interval: \(Self.checkInterval)s)")
+        Log.liveness.info("Started (check interval: \(Self.checkInterval)s, timeout: \(self.currentTimeout())s)")
     }
 
     /// Stops the repeating liveness check timer.
@@ -77,6 +77,7 @@ final class SessionLivenessMonitor {
         timer?.cancel()
         timer = nil
         isRunning = false
+        Log.liveness.info("Stopped")
     }
 
     // MARK: - Liveness Check
@@ -89,7 +90,7 @@ final class SessionLivenessMonitor {
                 return seconds
             }
         } catch {
-            NSLog("Whippet: Failed to read staleness timeout setting: \(error.localizedDescription)")
+            Log.liveness.warning("Failed to read staleness timeout setting: \(error.localizedDescription, privacy: .public)")
         }
         return Self.defaultTimeoutSeconds
     }
@@ -105,7 +106,7 @@ final class SessionLivenessMonitor {
 
             let count = try databaseManager.markStaleSessions(olderThan: timeout)
             if count > 0 {
-                NSLog("Whippet: Marked \(count) session(s) as stale (timeout: \(timeout)s)")
+                Log.liveness.info("Marked \(count) session(s) as stale (timeout: \(timeout)s)")
                 onSessionsMarkedStale?(count)
 
                 // Notify per-session callback for notifications
@@ -118,7 +119,7 @@ final class SessionLivenessMonitor {
                 }
             }
         } catch {
-            NSLog("Whippet: Liveness check failed: \(error.localizedDescription)")
+            Log.liveness.error("Liveness check failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 }

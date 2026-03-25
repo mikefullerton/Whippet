@@ -11,7 +11,7 @@ final class DatabaseManager {
     private let queue = DispatchQueue(label: "com.mikefullerton.whippet.database", qos: .userInitiated)
 
     /// The current schema version. Increment this when adding new migrations.
-    static let currentSchemaVersion = 1
+    static let currentSchemaVersion = 2
 
     // MARK: - Initialization
 
@@ -25,6 +25,7 @@ final class DatabaseManager {
         }
         try openDatabase()
         try runMigrations()
+        Log.database.info("Database ready at \(self.dbPath, privacy: .public)")
     }
 
     deinit {
@@ -52,9 +53,11 @@ final class DatabaseManager {
     // MARK: - Connection
 
     private func openDatabase() throws {
+        Log.database.debug("Opening database at \(self.dbPath, privacy: .public)")
         let result = sqlite3_open(dbPath, &db)
         guard result == SQLITE_OK else {
             let message = String(cString: sqlite3_errmsg(db))
+            Log.database.error("Failed to open database: \(message, privacy: .public)")
             throw DatabaseError.openFailed(message)
         }
 
@@ -62,12 +65,14 @@ final class DatabaseManager {
         try execute("PRAGMA journal_mode=WAL")
         // Enable foreign keys
         try execute("PRAGMA foreign_keys=ON")
+        Log.database.debug("Database opened — WAL mode enabled")
     }
 
     func close() {
         if let db = db {
             sqlite3_close(db)
             self.db = nil
+            Log.database.info("Database connection closed")
         }
     }
 
@@ -83,13 +88,19 @@ final class DatabaseManager {
         """)
 
         let currentVersion = try schemaVersion()
+        Log.database.debug("Current schema version: \(currentVersion)")
 
         if currentVersion < 1 {
+            Log.database.info("Running migration 001: create tables")
             try migration001_createTables()
+            Log.database.info("Migration 001 complete")
         }
 
-        // Future migrations go here:
-        // if currentVersion < 2 { try migration002_xxx() }
+        if currentVersion < 2 {
+            Log.database.info("Running migration 002: add session metadata")
+            try migration002_addSessionMetadata()
+            Log.database.info("Migration 002 complete")
+        }
     }
 
     private func schemaVersion() throws -> Int {
@@ -159,6 +170,12 @@ final class DatabaseManager {
         try execute("INSERT INTO schema_migrations (version) VALUES (1)")
     }
 
+    private func migration002_addSessionMetadata() throws {
+        try execute("ALTER TABLE sessions ADD COLUMN git_branch TEXT NOT NULL DEFAULT ''")
+        try execute("ALTER TABLE sessions ADD COLUMN summary TEXT NOT NULL DEFAULT ''")
+        try execute("INSERT INTO schema_migrations (version) VALUES (2)")
+    }
+
     // MARK: - SQL Helpers
 
     private var lastErrorMessage: String {
@@ -175,6 +192,7 @@ final class DatabaseManager {
         if result != SQLITE_OK {
             let message = errorMessage.map { String(cString: $0) } ?? "Unknown error"
             sqlite3_free(errorMessage)
+            Log.database.error("SQL execution failed: \(message, privacy: .public)")
             throw DatabaseError.executionFailed(message)
         }
         return result
@@ -186,14 +204,16 @@ final class DatabaseManager {
     @discardableResult
     func upsertSession(_ session: Session) throws -> Session {
         let sql = """
-            INSERT INTO sessions (session_id, cwd, model, started_at, last_activity_at, last_tool, status)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO sessions (session_id, cwd, model, started_at, last_activity_at, last_tool, status, git_branch, summary)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(session_id) DO UPDATE SET
                 cwd = CASE WHEN excluded.cwd != '' THEN excluded.cwd ELSE sessions.cwd END,
                 model = CASE WHEN excluded.model != '' THEN excluded.model ELSE sessions.model END,
                 last_activity_at = excluded.last_activity_at,
                 last_tool = CASE WHEN excluded.last_tool != '' THEN excluded.last_tool ELSE sessions.last_tool END,
-                status = excluded.status
+                status = excluded.status,
+                git_branch = CASE WHEN excluded.git_branch != '' THEN excluded.git_branch ELSE sessions.git_branch END,
+                summary = CASE WHEN excluded.summary != '' THEN excluded.summary ELSE sessions.summary END
         """
 
         var stmt: OpaquePointer?
@@ -210,10 +230,15 @@ final class DatabaseManager {
         sqlite3_bind_text(stmt, 5, (session.lastActivityAt as NSString).utf8String, -1, nil)
         sqlite3_bind_text(stmt, 6, (session.lastTool as NSString).utf8String, -1, nil)
         sqlite3_bind_text(stmt, 7, (session.status.rawValue as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 8, (session.gitBranch as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 9, (session.summary as NSString).utf8String, -1, nil)
 
         guard sqlite3_step(stmt) == SQLITE_DONE else {
+            Log.database.error("Upsert session failed for \(session.sessionId, privacy: .public): \(self.lastErrorMessage, privacy: .public)")
             throw DatabaseError.executionFailed(lastErrorMessage)
         }
+
+        Log.database.debug("Upserted session \(session.sessionId, privacy: .public) status=\(session.status.rawValue, privacy: .public)")
 
         // Return the session with its database ID
         if let fetched = try fetchSession(bySessionId: session.sessionId) {
@@ -224,7 +249,7 @@ final class DatabaseManager {
 
     /// Fetches a session by its unique session_id string.
     func fetchSession(bySessionId sessionId: String) throws -> Session? {
-        let sql = "SELECT id, session_id, cwd, model, started_at, last_activity_at, last_tool, status FROM sessions WHERE session_id = ?"
+        let sql = "SELECT id, session_id, cwd, model, started_at, last_activity_at, last_tool, status, git_branch, summary FROM sessions WHERE session_id = ?"
 
         var stmt: OpaquePointer?
         defer { sqlite3_finalize(stmt) }
@@ -248,7 +273,7 @@ final class DatabaseManager {
         defer { sqlite3_finalize(stmt) }
 
         if let status = status {
-            let sql = "SELECT id, session_id, cwd, model, started_at, last_activity_at, last_tool, status FROM sessions WHERE status = ? ORDER BY last_activity_at DESC"
+            let sql = "SELECT id, session_id, cwd, model, started_at, last_activity_at, last_tool, status, git_branch, summary FROM sessions WHERE status = ? ORDER BY last_activity_at DESC"
 
             guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
                 throw DatabaseError.prepareFailed(lastErrorMessage)
@@ -256,7 +281,7 @@ final class DatabaseManager {
 
             sqlite3_bind_text(stmt, 1, (status.rawValue as NSString).utf8String, -1, nil)
         } else {
-            let sql = "SELECT id, session_id, cwd, model, started_at, last_activity_at, last_tool, status FROM sessions ORDER BY last_activity_at DESC"
+            let sql = "SELECT id, session_id, cwd, model, started_at, last_activity_at, last_tool, status, git_branch, summary FROM sessions ORDER BY last_activity_at DESC"
 
             guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
                 throw DatabaseError.prepareFailed(lastErrorMessage)
@@ -272,6 +297,7 @@ final class DatabaseManager {
 
     /// Updates the status of a session.
     func updateSessionStatus(sessionId: String, status: SessionStatus) throws {
+        Log.database.debug("Updating session \(sessionId, privacy: .public) → \(status.rawValue, privacy: .public)")
         let sql = "UPDATE sessions SET status = ?, last_activity_at = datetime('now') WHERE session_id = ?"
 
         var stmt: OpaquePointer?
@@ -289,8 +315,47 @@ final class DatabaseManager {
         }
     }
 
+    /// Updates the summary of a session.
+    func updateSessionSummary(sessionId: String, summary: String) throws {
+        let sql = "UPDATE sessions SET summary = ? WHERE session_id = ?"
+
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.prepareFailed(lastErrorMessage)
+        }
+
+        sqlite3_bind_text(stmt, 1, (summary as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 2, (sessionId as NSString).utf8String, -1, nil)
+
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw DatabaseError.executionFailed(lastErrorMessage)
+        }
+    }
+
+    /// Updates the git branch of a session.
+    func updateSessionGitBranch(sessionId: String, gitBranch: String) throws {
+        let sql = "UPDATE sessions SET git_branch = ? WHERE session_id = ?"
+
+        var stmt: OpaquePointer?
+        defer { sqlite3_finalize(stmt) }
+
+        guard sqlite3_prepare_v2(db, sql, -1, &stmt, nil) == SQLITE_OK else {
+            throw DatabaseError.prepareFailed(lastErrorMessage)
+        }
+
+        sqlite3_bind_text(stmt, 1, (gitBranch as NSString).utf8String, -1, nil)
+        sqlite3_bind_text(stmt, 2, (sessionId as NSString).utf8String, -1, nil)
+
+        guard sqlite3_step(stmt) == SQLITE_DONE else {
+            throw DatabaseError.executionFailed(lastErrorMessage)
+        }
+    }
+
     /// Deletes a session and all its associated events.
     func deleteSession(sessionId: String) throws {
+        Log.database.info("Deleting session \(sessionId, privacy: .public) and its events")
         // Delete events first (foreign key dependency)
         let deleteEventsSql = "DELETE FROM events WHERE session_id = ?"
         var evtStmt: OpaquePointer?
@@ -320,7 +385,7 @@ final class DatabaseManager {
     /// Used by the liveness monitor to know which sessions will transition to stale.
     func fetchActiveSessionsPastTimeout(_ seconds: TimeInterval) throws -> [Session] {
         let sql = """
-            SELECT id, session_id, cwd, model, started_at, last_activity_at, last_tool, status
+            SELECT id, session_id, cwd, model, started_at, last_activity_at, last_tool, status, git_branch, summary
             FROM sessions
             WHERE status = 'active'
             AND datetime(last_activity_at, '+' || ? || ' seconds') < datetime('now')
@@ -364,7 +429,11 @@ final class DatabaseManager {
         guard sqlite3_step(stmt) == SQLITE_DONE else {
             throw DatabaseError.executionFailed(lastErrorMessage)
         }
-        return Int(sqlite3_changes(db))
+        let count = Int(sqlite3_changes(db))
+        if count > 0 {
+            Log.database.debug("Marked \(count) session(s) as stale (timeout: \(Int(seconds))s)")
+        }
+        return count
     }
 
     private func sessionFromRow(_ stmt: OpaquePointer?) -> Session {
@@ -376,7 +445,9 @@ final class DatabaseManager {
             startedAt: String(cString: sqlite3_column_text(stmt, 4)),
             lastActivityAt: String(cString: sqlite3_column_text(stmt, 5)),
             lastTool: String(cString: sqlite3_column_text(stmt, 6)),
-            status: SessionStatus(rawValue: String(cString: sqlite3_column_text(stmt, 7))) ?? .active
+            status: SessionStatus(rawValue: String(cString: sqlite3_column_text(stmt, 7))) ?? .active,
+            gitBranch: String(cString: sqlite3_column_text(stmt, 8)),
+            summary: String(cString: sqlite3_column_text(stmt, 9))
         )
     }
 

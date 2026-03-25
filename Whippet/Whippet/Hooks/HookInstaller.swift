@@ -74,7 +74,7 @@ final class HookInstaller {
 
             // Check if Whippet hooks are already installed
             if hooksAlreadyInstalled(in: settings) {
-                NSLog("Whippet: Hooks already installed in \(settingsURL.path)")
+                Log.hooks.info("Hooks already installed in \(self.settingsURL.path, privacy: .public)")
                 return .alreadyInstalled
             }
 
@@ -91,10 +91,10 @@ final class HookInstaller {
             // Write the updated settings back
             try saveSettings(settings)
 
-            NSLog("Whippet: Hooks installed successfully in \(settingsURL.path)")
+            Log.hooks.info("Hooks installed for \(Self.hookedEventTypes.count) event types in \(self.settingsURL.path, privacy: .public)")
             return .installed
         } catch {
-            NSLog("Whippet: Failed to install hooks: \(error.localizedDescription)")
+            Log.hooks.error("Failed to install hooks: \(error.localizedDescription, privacy: .public)")
             return .failed(error.localizedDescription)
         }
     }
@@ -131,12 +131,12 @@ final class HookInstaller {
             if removed {
                 settings["hooks"] = hooks.isEmpty ? nil : hooks
                 try saveSettings(settings)
-                NSLog("Whippet: Hooks uninstalled from \(settingsURL.path)")
+                Log.hooks.info("Hooks uninstalled from \(self.settingsURL.path, privacy: .public)")
             }
 
             return removed
         } catch {
-            NSLog("Whippet: Failed to uninstall hooks: \(error.localizedDescription)")
+            Log.hooks.error("Failed to uninstall hooks: \(error.localizedDescription, privacy: .public)")
             return false
         }
     }
@@ -229,7 +229,8 @@ final class HookInstaller {
         RAND=$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \\n' 2>/dev/null || echo $$)
         DIR=\(dropDirectory)
         mkdir -p "$DIR"
-        echo "$INPUT" | jq -c '\(jqFilter)' > "$DIR/${TIMESTAMP}-${RAND}.json" 2>/dev/null
+        OUTPUT=$(echo "$INPUT" | jq -c '\(jqFilter)' 2>/dev/null)
+        [ -n "$OUTPUT" ] && echo "$OUTPUT" > "$DIR/${TIMESTAMP}-${RAND}.json"
         exit 0
         """
 
