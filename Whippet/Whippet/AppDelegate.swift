@@ -9,7 +9,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var livenessMonitor: SessionLivenessMonitor?
     private var notificationManager: NotificationManager?
     private(set) var panelController = SessionPanelController()
-    private(set) var settingsController = SettingsWindowController()
 
     // MARK: - App Lifecycle
 
@@ -18,7 +17,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenuBar()
         setupDatabase()
         setupPanelController()
-        setupSettingsController()
         installHooksIfNeeded()
         setupNotifications()
         setupIngestion()
@@ -53,27 +51,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         panelController.setDatabaseManager(db)
-        panelController.onSettingsRequested = { [weak self] in
-            self?.settingsController.showSettings()
-        }
-        Log.app.debug("Panel controller configured")
-    }
-
-    // MARK: - Settings Controller
-
-    private func setupSettingsController() {
-        guard let db = databaseManager else {
-            Log.app.warning("Cannot setup settings controller — no database")
-            return
-        }
-        settingsController.configure(databaseManager: db, panelController: panelController)
 
         // Apply saved appearance mode
         if let mode = try? db.getSetting(key: SettingsViewModel.appearanceModeKey) {
             applyAppearanceMode(mode)
         }
 
-        Log.app.debug("Settings controller configured")
+        Log.app.debug("Panel controller configured")
     }
 
     // MARK: - Hooks
@@ -198,7 +182,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettings() {
         Log.ui.debug("Menu action: Settings")
-        settingsController.showSettings()
+        panelController.showPanel()
+        panelController.toggleSettings()
     }
 
     @objc private func quitApp() {

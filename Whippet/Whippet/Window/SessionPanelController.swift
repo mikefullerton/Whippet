@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 
 /// Manages the lifecycle and visibility of the floating session panel.
 final class SessionPanelController {
@@ -8,15 +9,17 @@ final class SessionPanelController {
 
     private(set) var panel: SessionPanel?
     private(set) var viewModel: SessionListViewModel?
+    private(set) var settingsViewModel: SettingsViewModel?
     private var hostingController: NSHostingController<SessionContentView>?
 
     /// Key used to persist the panel frame in UserDefaults.
     static let frameAutosaveName = "WhippetSessionPanel"
 
-    private var databaseManager: DatabaseManager?
+    /// Width added when the settings drawer is visible.
+    static let drawerWidth: CGFloat = 300
 
-    /// Called when the user clicks the gear icon. AppDelegate wires this to open settings.
-    var onSettingsRequested: (() -> Void)?
+    private var databaseManager: DatabaseManager?
+    private var settingsCancellable: AnyCancellable?
 
     // Window discovery panel
     private var discoveryPanel: NSPanel?
@@ -32,10 +35,36 @@ final class SessionPanelController {
         self.databaseManager = databaseManager
         self.viewModel = SessionListViewModel(databaseManager: databaseManager)
 
+        // Create settings view model
+        let launchAtLoginManager = LaunchAtLoginManager(databaseManager: databaseManager)
+        let settingsVM = SettingsViewModel(databaseManager: databaseManager, launchAtLoginManager: launchAtLoginManager)
+        settingsVM.onAlwaysOnTopChanged = { [weak self] isFloating in
+            self?.panel?.isFloating = isFloating
+        }
+        settingsVM.onTransparencyChanged = { [weak self] alpha in
+            self?.panel?.transparency = alpha
+        }
+        settingsVM.onAppearanceModeChanged = { mode in
+            switch mode {
+            case "light": NSApp.appearance = NSAppearance(named: .aqua)
+            case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+            default: NSApp.appearance = nil
+            }
+            Log.app.info("Appearance mode: \(mode, privacy: .public)")
+        }
+        self.settingsViewModel = settingsVM
+
         // Wire up window discovery request from click actions
         self.viewModel?.onWindowDiscoveryRequested = { [weak self] session in
             self?.showWindowDiscovery(for: session)
         }
+
+        // Observe settings drawer toggle and animate panel width
+        settingsCancellable = viewModel?.$showSettings
+            .dropFirst()
+            .sink { [weak self] showSettings in
+                self?.animateSettingsDrawer(visible: showSettings)
+            }
     }
 
     // MARK: - Panel Creation
@@ -43,7 +72,7 @@ final class SessionPanelController {
     private func createPanelIfNeeded() {
         guard panel == nil else { return }
 
-        guard let viewModel = viewModel else {
+        guard let viewModel = viewModel, let settingsViewModel = settingsViewModel else {
             Log.ui.warning("Creating panel without database manager — call setDatabaseManager first")
             return
         }
@@ -52,7 +81,7 @@ final class SessionPanelController {
         let defaultFrame = NSRect(x: 0, y: 0, width: 340, height: 300)
         let sessionPanel = SessionPanel(contentRect: defaultFrame)
 
-        let contentView = SessionContentView(viewModel: viewModel)
+        let contentView = SessionContentView(viewModel: viewModel, settingsViewModel: settingsViewModel)
         let hosting = NSHostingController(rootView: contentView)
         // Let the hosting view size itself to the SwiftUI content
         hosting.sizingOptions = [.preferredContentSize]
@@ -64,7 +93,7 @@ final class SessionPanelController {
             self?.promptQuit()
         }
         sessionPanel.onSettingsButtonPressed = { [weak self] in
-            self?.onSettingsRequested?()
+            self?.toggleSettings()
         }
 
         // Set autosave name BEFORE restoring frame
@@ -109,6 +138,37 @@ final class SessionPanelController {
         panel.saveFrame(usingName: Self.frameAutosaveName)
         panel.orderOut(nil)
         Log.ui.debug("Panel hidden")
+    }
+
+    // MARK: - Settings Drawer
+
+    func toggleSettings() {
+        guard let viewModel = viewModel else { return }
+        withAnimation(.easeInOut(duration: 0.25)) {
+            viewModel.showSettings.toggle()
+        }
+    }
+
+    private func animateSettingsDrawer(visible: Bool) {
+        guard let panel = panel else { return }
+
+        let currentFrame = panel.frame
+        let widthDelta = visible ? Self.drawerWidth : -Self.drawerWidth
+        let newWidth = max(currentFrame.width + widthDelta, panel.minSize.width)
+
+        // Expand/contract to the right
+        let newFrame = NSRect(
+            x: currentFrame.origin.x,
+            y: currentFrame.origin.y,
+            width: newWidth,
+            height: currentFrame.height
+        )
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0.25
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            panel.animator().setFrame(newFrame, display: true)
+        }
     }
 
     // MARK: - Size to Content

@@ -50,6 +50,9 @@ final class SessionListViewModel: ObservableObject {
     /// The action handler for session click actions.
     let actionHandler: SessionActionHandler
 
+    /// Whether the settings drawer is visible.
+    @Published var showSettings = false
+
     /// The last error message from a click action, shown briefly in the UI.
     @Published var lastActionError: String?
 
