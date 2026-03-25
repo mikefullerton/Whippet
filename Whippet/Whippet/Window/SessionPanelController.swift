@@ -123,6 +123,9 @@ final class SessionPanelController {
             sessionPanel.center()
         }
 
+        // Lock horizontal width initially (inspector starts collapsed)
+        sessionPanel.lockedWidth = sessionPanel.frame.width
+
         panel = sessionPanel
     }
 
@@ -161,6 +164,9 @@ final class SessionPanelController {
     func toggleSettings() {
         guard let inspector = inspectorItem, let panel = panel else { return }
 
+        // Unlock horizontal resize for the duration of the animation
+        panel.lockedWidth = nil
+
         if inspector.isCollapsed {
             // Opening: record current origin so we can restore on close
             preInspectorOrigin = panel.frame.origin
@@ -173,6 +179,7 @@ final class SessionPanelController {
             }, completionHandler: { [weak self] in
                 // Record where the window ended up after the system adjusted for screen bounds
                 self?.postInspectorOpenOrigin = self?.panel?.frame.origin
+                // Leave lockedWidth = nil so user can resize while inspector is open
             })
         } else {
             // Closing: check if the user moved the window since it was opened
@@ -198,6 +205,8 @@ final class SessionPanelController {
             }, completionHandler: { [weak self] in
                 self?.preInspectorOrigin = nil
                 self?.postInspectorOpenOrigin = nil
+                // Lock width now that inspector is collapsed
+                self?.panel?.lockedWidth = self?.panel?.frame.width
             })
         }
     }

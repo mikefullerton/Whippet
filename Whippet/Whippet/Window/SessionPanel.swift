@@ -4,7 +4,7 @@ import AppKit
 ///
 /// Has a visible title bar with close button (prompts to quit) and a gear icon
 /// for settings. Stays above all windows when floating is enabled.
-final class SessionPanel: NSPanel {
+final class SessionPanel: NSPanel, NSWindowDelegate {
 
     /// Called when the user clicks the close button. The controller should present
     /// a quit confirmation instead of actually closing.
@@ -12,6 +12,10 @@ final class SessionPanel: NSPanel {
 
     /// Called when the user clicks the gear icon in the title bar.
     var onSettingsButtonPressed: (() -> Void)?
+
+    /// When set, user-initiated horizontal resizing is locked to this width.
+    /// Set to nil to allow free horizontal resize (e.g. while inspector is open).
+    var lockedWidth: CGFloat?
 
     // MARK: - Initialization
 
@@ -29,8 +33,18 @@ final class SessionPanel: NSPanel {
             defer: false
         )
 
+        delegate = self
         configureDefaults()
         addTitleBarAccessory()
+    }
+
+    // MARK: - NSWindowDelegate
+
+    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
+        if let locked = lockedWidth {
+            return NSSize(width: locked, height: frameSize.height)
+        }
+        return frameSize
     }
 
     // MARK: - Configuration
