@@ -1,36 +1,10 @@
 import SwiftUI
 
 /// The main SwiftUI view displayed inside the floating session palette.
-/// Contains the session list on the left and an optional settings drawer on the right.
 struct SessionContentView: View {
     @ObservedObject var viewModel: SessionListViewModel
-    @ObservedObject var settingsViewModel: SettingsViewModel
 
     var body: some View {
-        HStack(spacing: 0) {
-            // Session list (left side)
-            sessionSide
-                .frame(minWidth: 280, idealWidth: 340)
-
-            // Settings drawer (right side, slides in)
-            if viewModel.showSettings {
-                Divider()
-
-                SettingsDrawerView(viewModel: settingsViewModel) {
-                    withAnimation(.easeInOut(duration: 0.25)) {
-                        viewModel.showSettings = false
-                    }
-                }
-                .frame(width: 300)
-                .transition(.move(edge: .trailing).combined(with: .opacity))
-            }
-        }
-        .animation(.easeInOut(duration: 0.25), value: viewModel.showSettings)
-    }
-
-    // MARK: - Session Side
-
-    private var sessionSide: some View {
         VStack(spacing: 0) {
             if viewModel.isEmpty {
                 emptyState
@@ -75,6 +49,7 @@ struct SessionContentView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
+        .frame(minWidth: 280)
         .animation(.easeInOut(duration: 0.2), value: viewModel.lastActionError)
     }
 
@@ -130,81 +105,6 @@ struct SessionContentView: View {
                 .padding(8)
             }
         }
-    }
-}
-
-// MARK: - Settings Drawer View
-
-/// A compact single-column settings view for the slide-out drawer.
-/// Uses DisclosureGroups so users can expand only the section they need.
-struct SettingsDrawerView: View {
-    @ObservedObject var viewModel: SettingsViewModel
-    var onClose: () -> Void
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Settings")
-                    .font(.system(size: 13, weight: .semibold))
-                Spacer()
-                Button(action: onClose) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
-
-            Divider()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 4) {
-                    settingsSection("Appearance", image: "paintbrush") {
-                        AppearanceSettingsPane(viewModel: viewModel)
-                    }
-                    settingsSection("General", image: "gearshape") {
-                        GeneralSettingsPane(viewModel: viewModel)
-                    }
-                    settingsSection("Window", image: "macwindow") {
-                        WindowSettingsPane(viewModel: viewModel)
-                    }
-                    settingsSection("Actions", image: "cursorarrow.click") {
-                        ActionsSettingsPane(viewModel: viewModel)
-                    }
-                    settingsSection("Notifications", image: "bell") {
-                        NotificationsSettingsPane(viewModel: viewModel)
-                    }
-                    settingsSection("AI", image: "brain") {
-                        AISettingsPane(viewModel: viewModel)
-                    }
-                    settingsSection("Startup", image: "power") {
-                        StartupSettingsPane(viewModel: viewModel)
-                    }
-                }
-                .padding(8)
-            }
-        }
-    }
-
-    private func settingsSection<Content: View>(
-        _ title: String,
-        image: String,
-        @ViewBuilder content: @escaping () -> Content
-    ) -> some View {
-        DisclosureGroup {
-            content()
-                .padding(.top, 8)
-                .padding(.horizontal, 4)
-                .padding(.bottom, 4)
-        } label: {
-            Label(title, systemImage: image)
-                .font(.system(size: 11, weight: .medium))
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
     }
 }
 
@@ -357,14 +257,6 @@ struct SessionRowView: View {
                     .frame(width: 7, height: 7)
             }
         }
-    }
-
-    private func abbreviatedPath(_ path: String) -> String {
-        let home = FileManager.default.homeDirectoryForCurrentUser.path
-        if path.hasPrefix(home) {
-            return "~" + path.dropFirst(home.count)
-        }
-        return path
     }
 
     private func abbreviatedModel(_ model: String) -> String {

@@ -60,6 +60,84 @@ struct SettingsView: View {
     }
 }
 
+// MARK: - Settings Drawer View (for NSSplitViewItem inspector)
+
+/// Compact single-column settings for the native inspector panel.
+/// Uses DisclosureGroups so users can expand only the section they need.
+struct SettingsDrawerView: View {
+    @ObservedObject var viewModel: SettingsViewModel
+    var onClose: (() -> Void)?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Settings")
+                    .font(.system(size: 13, weight: .semibold))
+                Spacer()
+                if let onClose = onClose {
+                    Button(action: onClose) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            Divider()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 4) {
+                    settingsSection("Appearance", image: "paintbrush") {
+                        AppearanceSettingsPane(viewModel: viewModel)
+                    }
+                    settingsSection("General", image: "gearshape") {
+                        GeneralSettingsPane(viewModel: viewModel)
+                    }
+                    settingsSection("Window", image: "macwindow") {
+                        WindowSettingsPane(viewModel: viewModel)
+                    }
+                    settingsSection("Actions", image: "cursorarrow.click") {
+                        ActionsSettingsPane(viewModel: viewModel)
+                    }
+                    settingsSection("Notifications", image: "bell") {
+                        NotificationsSettingsPane(viewModel: viewModel)
+                    }
+                    settingsSection("AI", image: "brain") {
+                        AISettingsPane(viewModel: viewModel)
+                    }
+                    settingsSection("Startup", image: "power") {
+                        StartupSettingsPane(viewModel: viewModel)
+                    }
+                }
+                .padding(8)
+            }
+        }
+        .frame(minWidth: 280)
+    }
+
+    private func settingsSection<Content: View>(
+        _ title: String,
+        image: String,
+        @ViewBuilder content: @escaping () -> Content
+    ) -> some View {
+        DisclosureGroup {
+            content()
+                .padding(.top, 8)
+                .padding(.horizontal, 4)
+                .padding(.bottom, 4)
+        } label: {
+            Label(title, systemImage: image)
+                .font(.system(size: 11, weight: .medium))
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+    }
+}
+
 // MARK: - Appearance Settings Pane
 
 struct AppearanceSettingsPane: View {

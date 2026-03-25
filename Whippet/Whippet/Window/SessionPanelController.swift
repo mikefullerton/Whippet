@@ -1,8 +1,8 @@
 import AppKit
 import SwiftUI
-import Combine
 
 /// Manages the lifecycle and visibility of the floating session panel.
+/// Uses NSSplitViewController with a native inspector item for the settings drawer.
 final class SessionPanelController {
 
     // MARK: - Properties
@@ -10,16 +10,14 @@ final class SessionPanelController {
     private(set) var panel: SessionPanel?
     private(set) var viewModel: SessionListViewModel?
     private(set) var settingsViewModel: SettingsViewModel?
-    private var hostingController: NSHostingController<SessionContentView>?
+
+    private var splitViewController: NSSplitViewController?
+    private var inspectorItem: NSSplitViewItem?
 
     /// Key used to persist the panel frame in UserDefaults.
     static let frameAutosaveName = "WhippetSessionPanel"
 
-    /// Width added when the settings drawer is visible.
-    static let drawerWidth: CGFloat = 300
-
     private var databaseManager: DatabaseManager?
-    private var settingsCancellable: AnyCancellable?
 
     // Window discovery panel
     private var discoveryPanel: NSPanel?
@@ -58,13 +56,6 @@ final class SessionPanelController {
         self.viewModel?.onWindowDiscoveryRequested = { [weak self] session in
             self?.showWindowDiscovery(for: session)
         }
-
-        // Observe settings drawer toggle and animate panel width
-        settingsCancellable = viewModel?.$showSettings
-            .dropFirst()
-            .sink { [weak self] showSettings in
-                self?.animateSettingsDrawer(visible: showSettings)
-            }
     }
 
     // MARK: - Panel Creation
@@ -81,12 +72,38 @@ final class SessionPanelController {
         let defaultFrame = NSRect(x: 0, y: 0, width: 340, height: 300)
         let sessionPanel = SessionPanel(contentRect: defaultFrame)
 
-        let contentView = SessionContentView(viewModel: viewModel, settingsViewModel: settingsViewModel)
-        let hosting = NSHostingController(rootView: contentView)
-        // Let the hosting view size itself to the SwiftUI content
-        hosting.sizingOptions = [.preferredContentSize]
-        sessionPanel.contentView = hosting.view
-        hostingController = hosting
+        // -- Session content (main item) --
+        let sessionView = SessionContentView(viewModel: viewModel)
+        let sessionHosting = NSHostingController(rootView: sessionView)
+        sessionHosting.sizingOptions = [.preferredContentSize]
+
+        let sessionItem = NSSplitViewItem(viewController: sessionHosting)
+        sessionItem.minimumThickness = 280
+        sessionItem.canCollapse = false
+
+        // -- Settings inspector (right-side drawer) --
+        let settingsView = SettingsDrawerView(viewModel: settingsViewModel) { [weak self] in
+            self?.toggleSettings()
+        }
+        let settingsHosting = NSHostingController(rootView: settingsView)
+        settingsHosting.sizingOptions = [.preferredContentSize]
+
+        let inspector = NSSplitViewItem(inspectorWithViewController: settingsHosting)
+        inspector.minimumThickness = 280
+        inspector.maximumThickness = 340
+        inspector.preferredThicknessFraction = 0.45
+        inspector.isCollapsed = true
+        self.inspectorItem = inspector
+
+        // -- Split view controller --
+        let splitVC = NSSplitViewController()
+        splitVC.addSplitViewItem(sessionItem)
+        splitVC.addSplitViewItem(inspector)
+        splitVC.splitView.dividerStyle = .thin
+        splitVC.splitView.autosaveName = "WhippetSplitView"
+        self.splitViewController = splitVC
+
+        sessionPanel.contentViewController = splitVC
 
         // Wire callbacks
         sessionPanel.onCloseButtonPressed = { [weak self] in
@@ -102,9 +119,6 @@ final class SessionPanelController {
         if !sessionPanel.setFrameUsingName(Self.frameAutosaveName) {
             sessionPanel.center()
         }
-
-        // Observe content size changes to resize the window to fit
-        hostingController?.view.setContentHuggingPriority(.defaultHigh, for: .vertical)
 
         panel = sessionPanel
     }
@@ -128,7 +142,6 @@ final class SessionPanelController {
         guard let panel = panel else { return }
 
         viewModel?.loadSessions()
-        sizeWindowToContent()
         panel.orderFront(nil)
         Log.ui.debug("Panel shown")
     }
@@ -140,55 +153,19 @@ final class SessionPanelController {
         Log.ui.debug("Panel hidden")
     }
 
-    // MARK: - Settings Drawer
+    // MARK: - Settings Inspector
 
     func toggleSettings() {
-        guard let viewModel = viewModel else { return }
-        withAnimation(.easeInOut(duration: 0.25)) {
-            viewModel.showSettings.toggle()
-        }
-    }
-
-    private func animateSettingsDrawer(visible: Bool) {
-        guard let panel = panel else { return }
-
-        let currentFrame = panel.frame
-        let widthDelta = visible ? Self.drawerWidth : -Self.drawerWidth
-        let newWidth = max(currentFrame.width + widthDelta, panel.minSize.width)
-
-        // Expand/contract to the right
-        let newFrame = NSRect(
-            x: currentFrame.origin.x,
-            y: currentFrame.origin.y,
-            width: newWidth,
-            height: currentFrame.height
-        )
-
+        guard let inspector = inspectorItem else { return }
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.25
-            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-            panel.animator().setFrame(newFrame, display: true)
+            context.duration = 0.2
+            context.allowsImplicitAnimation = true
+            inspector.animator().isCollapsed.toggle()
         }
     }
 
-    // MARK: - Size to Content
-
-    /// Resizes the window height to fit the SwiftUI content, keeping the current width and position.
-    func sizeWindowToContent() {
-        guard let panel = panel, let hosting = hostingController else { return }
-
-        let fittingSize = hosting.view.fittingSize
-        let currentFrame = panel.frame
-
-        // Keep the current width (user may have resized), adjust height to content
-        let newHeight = max(fittingSize.height + panel.titlebarHeight, panel.minSize.height)
-        let newFrame = NSRect(
-            x: currentFrame.origin.x,
-            y: currentFrame.origin.y + currentFrame.height - newHeight,
-            width: currentFrame.width,
-            height: newHeight
-        )
-        panel.setFrame(newFrame, display: true, animate: false)
+    var isSettingsVisible: Bool {
+        inspectorItem?.isCollapsed == false
     }
 
     // MARK: - Quit Confirmation
@@ -211,7 +188,6 @@ final class SessionPanelController {
     // MARK: - Window Discovery
 
     func showWindowDiscovery(for session: Session) {
-        // Dismiss any existing discovery panel
         dismissWindowDiscovery()
 
         let vm = WindowDiscoveryViewModel(session: session)
@@ -265,16 +241,5 @@ final class SessionPanelController {
             createPanelIfNeeded()
             panel?.transparency = newValue
         }
-    }
-}
-
-// MARK: - NSPanel Extension
-
-private extension NSPanel {
-    /// The height of the title bar area.
-    var titlebarHeight: CGFloat {
-        contentRect(forFrameRect: frame).height < frame.height
-            ? frame.height - contentRect(forFrameRect: frame).height
-            : 22 // fallback
     }
 }
