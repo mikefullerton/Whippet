@@ -19,6 +19,11 @@ final class SessionPanelController {
 
     private var databaseManager: DatabaseManager?
 
+    /// The window origin before the inspector was opened, used to restore position on close.
+    private var preInspectorOrigin: NSPoint?
+    /// The window origin right after the inspector open animation finishes.
+    private var postInspectorOpenOrigin: NSPoint?
+
     // Window discovery panel
     private var discoveryPanel: NSPanel?
     private var discoveryHosting: NSHostingController<WindowDiscoveryView>?
@@ -75,7 +80,6 @@ final class SessionPanelController {
         // -- Session content (main item) --
         let sessionView = SessionContentView(viewModel: viewModel)
         let sessionHosting = NSHostingController(rootView: sessionView)
-        sessionHosting.sizingOptions = [.preferredContentSize]
 
         let sessionItem = NSSplitViewItem(viewController: sessionHosting)
         sessionItem.minimumThickness = 280
@@ -86,7 +90,6 @@ final class SessionPanelController {
             self?.toggleSettings()
         }
         let settingsHosting = NSHostingController(rootView: settingsView)
-        settingsHosting.sizingOptions = [.preferredContentSize]
 
         let inspector = NSSplitViewItem(inspectorWithViewController: settingsHosting)
         inspector.minimumThickness = 440
@@ -156,11 +159,46 @@ final class SessionPanelController {
     // MARK: - Settings Inspector
 
     func toggleSettings() {
-        guard let inspector = inspectorItem else { return }
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.2
-            context.allowsImplicitAnimation = true
-            inspector.animator().isCollapsed.toggle()
+        guard let inspector = inspectorItem, let panel = panel else { return }
+
+        if inspector.isCollapsed {
+            // Opening: record current origin so we can restore on close
+            preInspectorOrigin = panel.frame.origin
+            postInspectorOpenOrigin = nil
+
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.2
+                context.allowsImplicitAnimation = true
+                inspector.animator().isCollapsed = false
+            }, completionHandler: { [weak self] in
+                // Record where the window ended up after the system adjusted for screen bounds
+                self?.postInspectorOpenOrigin = self?.panel?.frame.origin
+            })
+        } else {
+            // Closing: check if the user moved the window since it was opened
+            let shouldRestore: Bool = {
+                guard let pre = preInspectorOrigin, let post = postInspectorOpenOrigin else { return false }
+                let current = panel.frame.origin
+                // If the window is still where the system put it (within 1pt tolerance), restore
+                return abs(current.x - post.x) < 1 && abs(current.y - post.y) < 1
+            }()
+
+            let restoreOrigin = shouldRestore ? preInspectorOrigin : nil
+
+            NSAnimationContext.runAnimationGroup({ context in
+                context.duration = 0.2
+                context.allowsImplicitAnimation = true
+                inspector.animator().isCollapsed = true
+
+                if let origin = restoreOrigin {
+                    var newFrame = panel.frame
+                    newFrame.origin = origin
+                    panel.animator().setFrame(newFrame, display: true)
+                }
+            }, completionHandler: { [weak self] in
+                self?.preInspectorOrigin = nil
+                self?.postInspectorOpenOrigin = nil
+            })
         }
     }
 
