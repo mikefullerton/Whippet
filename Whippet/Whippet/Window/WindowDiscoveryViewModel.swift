@@ -46,25 +46,35 @@ final class WindowDiscoveryViewModel: ObservableObject {
 
     // MARK: - Discovery
 
+    /// Snapshot of a running application's metadata, captured on the main thread.
+    private struct AppSnapshot {
+        let pid: pid_t
+        let name: String
+        let icon: NSImage?
+    }
+
     /// Enumerates all windows asynchronously. Call from onAppear.
     func discoverWindows() {
         isLoading = true
         accessibilityDenied = false
 
+        guard AXIsProcessTrusted() else {
+            isLoading = false
+            accessibilityDenied = true
+            return
+        }
+
+        // Snapshot app metadata on the main thread (NSWorkspace/NSRunningApplication are main-thread APIs)
+        let appSnapshots: [AppSnapshot] = NSWorkspace.shared.runningApplications.compactMap { app in
+            guard app.activationPolicy == .regular else { return nil }
+            return AppSnapshot(pid: app.processIdentifier, name: app.localizedName ?? "Unknown", icon: app.icon)
+        }
+        let projectName = session.projectName
+
+        // AX enumeration on a background thread — this is the slow part
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
-
-            guard AXIsProcessTrusted() else {
-                DispatchQueue.main.async {
-                    self.isLoading = false
-                    self.accessibilityDenied = true
-                }
-                return
-            }
-
-            let projectName = self.session.projectName
-            let results = self.enumerateWindows(matching: projectName)
-
+            let results = self.enumerateWindows(for: appSnapshots, matching: projectName)
             DispatchQueue.main.async {
                 self.apps = results
                 self.isLoading = false
@@ -72,18 +82,13 @@ final class WindowDiscoveryViewModel: ObservableObject {
         }
     }
 
-    /// Uses the Accessibility API to enumerate windows from all regular apps.
-    private func enumerateWindows(matching projectName: String) -> [DiscoveredApp] {
+    /// Queries the Accessibility API for each snapshotted app's windows.
+    /// Safe to call from any thread — only uses AX C API and the pre-captured snapshots.
+    private func enumerateWindows(for snapshots: [AppSnapshot], matching projectName: String) -> [DiscoveredApp] {
         var result: [DiscoveredApp] = []
 
-        for app in NSWorkspace.shared.runningApplications {
-            guard app.activationPolicy == .regular else { continue }
-
-            let pid = app.processIdentifier
-            let appName = app.localizedName ?? "Unknown"
-            let icon = app.icon
-
-            let axApp = AXUIElementCreateApplication(pid)
+        for app in snapshots {
+            let axApp = AXUIElementCreateApplication(app.pid)
             var windowsRef: CFTypeRef?
             guard AXUIElementCopyAttributeValue(axApp, kAXWindowsAttribute as CFString, &windowsRef) == .success,
                   let axWindows = windowsRef as? [AXUIElement] else { continue }
@@ -102,9 +107,9 @@ final class WindowDiscoveryViewModel: ObservableObject {
                     && title.localizedCaseInsensitiveContains(projectName)
 
                 windows.append(DiscoveredWindow(
-                    id: Int(pid) * 10000 + i,
+                    id: Int(app.pid) * 10000 + i,
                     title: title,
-                    pid: pid,
+                    pid: app.pid,
                     axElement: axWindow,
                     isMatch: isMatch
                 ))
@@ -113,9 +118,9 @@ final class WindowDiscoveryViewModel: ObservableObject {
             guard !windows.isEmpty else { continue }
 
             result.append(DiscoveredApp(
-                id: pid,
-                name: appName,
-                icon: icon,
+                id: app.pid,
+                name: app.name,
+                icon: app.icon,
                 windows: windows
             ))
         }
