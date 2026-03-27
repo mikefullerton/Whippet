@@ -1,9 +1,10 @@
 import AppKit
+import ApplicationServices
 import UserNotifications
 
 /// The System Settings pane to open when guiding the user to fix a permission.
 enum PermissionPane: String {
-    case accessibility = "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+    case accessibility
     case automation = "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation"
     case notifications = "x-apple.systempreferences:com.apple.preference.security?Privacy_Notifications"
 
@@ -16,8 +17,17 @@ enum PermissionPane: String {
     }
 
     func open() {
-        if let url = URL(string: rawValue) {
-            NSWorkspace.shared.open(url)
+        switch self {
+        case .accessibility:
+            Log.app.info("Opening Accessibility settings via AXIsProcessTrustedWithOptions")
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
+            let trusted = AXIsProcessTrustedWithOptions(options)
+            Log.app.info("AXIsProcessTrustedWithOptions returned: \(trusted)")
+        default:
+            Log.app.info("Opening System Settings URL: \(rawValue, privacy: .public)")
+            if let url = URL(string: rawValue) {
+                NSWorkspace.shared.open(url)
+            }
         }
     }
 }
@@ -91,7 +101,7 @@ final class SessionActionHandler {
     var currentAction: SessionClickAction {
         guard let value = try? databaseManager.getSetting(key: Self.clickActionKey),
               let action = SessionClickAction(rawValue: value) else {
-            return .openTerminal
+            return .activateWindow
         }
         return action
     }
@@ -352,22 +362,32 @@ final class SessionActionHandler {
 
     private func activateMatchingWindow(for session: Session) -> SessionActionResult {
         let projectName = session.projectName
-        Log.actions.info("activateWindow: looking for window matching '\(projectName, privacy: .public)'")
+        let branch = session.gitBranch
+        let log = ActivationTestLog.shared
+        log.append("activateMatchingWindow: project=\"\(projectName)\" branch=\"\(branch)\" cwd=\"\(session.cwd)\"")
 
         guard projectName != "Unknown" else {
-            Log.actions.warning("activateWindow: no project name (empty cwd)")
             return .failure(.commandFailed("No project name to match — session has no working directory"))
         }
 
         guard Self.isAccessibilityTrusted else {
-            Log.actions.error("activateWindow: Accessibility permission not granted")
             return .failure(.permissionDenied(
                 "Whippet needs Accessibility access to discover windows. Grant access in System Settings.",
                 pane: .accessibility
             ))
         }
 
-        // Use Accessibility API to enumerate windows (doesn't need Screen Recording)
+        // Collect all candidate windows across all apps, scored by match quality
+        struct Candidate {
+            let app: NSRunningApplication
+            let axApp: AXUIElement
+            let axWindow: AXUIElement
+            let title: String
+            let score: Int
+        }
+
+        var candidates: [Candidate] = []
+
         for app in NSWorkspace.shared.runningApplications {
             guard app.activationPolicy == .regular else { continue }
             let pid = app.processIdentifier
@@ -380,19 +400,115 @@ final class SessionActionHandler {
                 var titleRef: CFTypeRef?
                 AXUIElementCopyAttributeValue(axWindow, kAXTitleAttribute as CFString, &titleRef)
                 guard let title = titleRef as? String, !title.isEmpty else { continue }
+                guard title.localizedCaseInsensitiveContains(projectName) else { continue }
 
-                if title.localizedCaseInsensitiveContains(projectName) {
-                    let appName = app.localizedName ?? "?"
-                    Log.actions.info("activateWindow: matched '\(title, privacy: .public)' in \(appName, privacy: .public) (PID \(pid))")
-                    app.activate()
-                    AXUIElementPerformAction(axWindow, kAXRaiseAction as CFString)
-                    return .success
+                // Score: higher is better
+                var score = 1  // base: project name matches
+
+                // +2 if title ends with "*" (Warp marks active/modified tabs)
+                if title.hasSuffix("*") {
+                    score += 2
                 }
+
+                // +10 if branch also matches in the title
+                if !branch.isEmpty && title.localizedCaseInsensitiveContains(branch) {
+                    score += 10
+                }
+
+                // +5 if the full cwd last two components match (e.g., "projects/Whippet")
+                let cwdComponents = session.cwd.split(separator: "/").suffix(2)
+                if cwdComponents.count == 2 {
+                    let twoLevel = cwdComponents.joined(separator: "/")
+                    if title.localizedCaseInsensitiveContains(twoLevel) {
+                        score += 5
+                    }
+                }
+
+                // +20 if this app matches the session's terminal program
+                let bundleId = app.bundleIdentifier ?? ""
+                if !session.termProgram.isEmpty {
+                    if (session.termProgram == "WarpTerminal" && bundleId.contains("warp"))
+                        || (session.termProgram == "Apple_Terminal" && bundleId.contains("Terminal"))
+                        || (session.termProgram == "iTerm.app" && bundleId.contains("iterm"))
+                        || (session.termProgram == "vscode" && bundleId.contains("VSCode")) {
+                        score += 20
+                    }
+                } else {
+                    // No termProgram recorded — prefer known terminal apps
+                    if bundleId.contains("warp") || bundleId.contains("Terminal")
+                        || bundleId.contains("iterm") || bundleId.contains("VSCode") {
+                        score += 10
+                    }
+                }
+
+                candidates.append(Candidate(app: app, axApp: axApp, axWindow: axWindow, title: title, score: score))
             }
         }
 
-        Log.actions.info("activateWindow: no window found matching '\(projectName, privacy: .public)'")
-        return .failure(.commandFailed("No window found matching \"\(projectName)\""))
+        // Sort by score descending (stable sort preserves window order for ties)
+        let sorted = candidates.sorted { $0.score > $1.score }
+
+        log.append("  Candidates: \(sorted.count)")
+        for (i, c) in sorted.enumerated() {
+            log.append("    [\(i)] score=\(c.score) \"\(c.title)\"")
+        }
+
+        guard !sorted.isEmpty else {
+            log.append("  No match found")
+            return .failure(.commandFailed("No window found matching \"\(projectName)\""))
+        }
+
+        // If the frontmost window already matches this project, cycle to the next one.
+        // This handles multiple sessions in the same project (e.g., two Whippet tabs).
+        let best: Candidate
+        if let frontApp = NSWorkspace.shared.frontmostApplication,
+           let firstCandidate = sorted.first,
+           firstCandidate.app.processIdentifier == frontApp.processIdentifier {
+            // Get the current main window's AX element for identity comparison
+            let axFrontApp = AXUIElementCreateApplication(frontApp.processIdentifier)
+            var mainRef: CFTypeRef?
+            AXUIElementCopyAttributeValue(axFrontApp, kAXMainWindowAttribute as CFString, &mainRef)
+            var currentTitle = ""
+            if let main = mainRef {
+                var titleRef: CFTypeRef?
+                AXUIElementCopyAttributeValue(main as! AXUIElement, kAXTitleAttribute as CFString, &titleRef)
+                currentTitle = (titleRef as? String) ?? ""
+            }
+
+            if currentTitle.localizedCaseInsensitiveContains(projectName),
+               sorted.count > 1,
+               let currentMain = mainRef {
+                // Current window already matches — cycle to the next AX element.
+                // Compare by AX element identity (CFEqual), not title, since
+                // multiple tabs can have identical titles.
+                if let next = sorted.first(where: { !CFEqual($0.axWindow, currentMain as! AXUIElement) }) {
+                    best = next
+                    log.append("  Cycling: current=\"\(currentTitle)\" → next=\"\(best.title)\"")
+                } else {
+                    best = sorted[0]
+                    log.append("  Only one AX element, using first")
+                }
+            } else {
+                best = sorted[0]
+            }
+        } else {
+            best = sorted[0]
+        }
+
+        log.append("  Selected: score=\(best.score) \"\(best.title)\"")
+
+        // Activate: app → pause → raise+setMain+setFocused → pause → raise
+        best.app.activate()
+        Thread.sleep(forTimeInterval: 0.15)
+
+        AXUIElementPerformAction(best.axWindow, kAXRaiseAction as CFString)
+        AXUIElementSetAttributeValue(best.axWindow, kAXMainAttribute as CFString, true as CFTypeRef)
+        AXUIElementSetAttributeValue(best.axApp, kAXFocusedWindowAttribute as CFString, best.axWindow)
+
+        Thread.sleep(forTimeInterval: 0.15)
+        AXUIElementPerformAction(best.axWindow, kAXRaiseAction as CFString)
+
+        return .success
     }
 
     private func raiseWindow(pid: pid_t, windowName: String) {

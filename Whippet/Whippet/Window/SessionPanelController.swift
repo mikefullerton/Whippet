@@ -2,27 +2,22 @@ import AppKit
 import SwiftUI
 
 /// Manages the lifecycle and visibility of the floating session panel.
-/// Uses NSSplitViewController with a native inspector item for the settings drawer.
 final class SessionPanelController {
 
     // MARK: - Properties
 
     private(set) var panel: SessionPanel?
     private(set) var viewModel: SessionListViewModel?
-    private(set) var settingsViewModel: SettingsViewModel?
-
-    private var splitViewController: NSSplitViewController?
-    private var inspectorItem: NSSplitViewItem?
 
     /// Key used to persist the panel frame in UserDefaults.
     static let frameAutosaveName = "WhippetSessionPanel"
 
     private var databaseManager: DatabaseManager?
+    private var hostingController: NSHostingController<SessionContentView>?
+    private var sizeObservation: NSKeyValueObservation?
 
-    /// The window origin before the inspector was opened, used to restore position on close.
-    private var preInspectorOrigin: NSPoint?
-    /// The window origin right after the inspector open animation finishes.
-    private var postInspectorOpenOrigin: NSPoint?
+    /// Called when the user clicks the gear icon. Set by AppDelegate to open the settings window.
+    var onSettingsButtonPressed: (() -> Void)?
 
     // Window discovery panel
     private var discoveryPanel: NSPanel?
@@ -38,25 +33,6 @@ final class SessionPanelController {
         self.databaseManager = databaseManager
         self.viewModel = SessionListViewModel(databaseManager: databaseManager)
 
-        // Create settings view model
-        let launchAtLoginManager = LaunchAtLoginManager(databaseManager: databaseManager)
-        let settingsVM = SettingsViewModel(databaseManager: databaseManager, launchAtLoginManager: launchAtLoginManager)
-        settingsVM.onAlwaysOnTopChanged = { [weak self] isFloating in
-            self?.panel?.isFloating = isFloating
-        }
-        settingsVM.onTransparencyChanged = { [weak self] alpha in
-            self?.panel?.transparency = alpha
-        }
-        settingsVM.onAppearanceModeChanged = { mode in
-            switch mode {
-            case "light": NSApp.appearance = NSAppearance(named: .aqua)
-            case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
-            default: NSApp.appearance = nil
-            }
-            Log.app.info("Appearance mode: \(mode, privacy: .public)")
-        }
-        self.settingsViewModel = settingsVM
-
         // Wire up window discovery request from click actions
         self.viewModel?.onWindowDiscoveryRequested = { [weak self] session in
             self?.showWindowDiscovery(for: session)
@@ -68,7 +44,7 @@ final class SessionPanelController {
     private func createPanelIfNeeded() {
         guard panel == nil else { return }
 
-        guard let viewModel = viewModel, let settingsViewModel = settingsViewModel else {
+        guard let viewModel = viewModel else {
             Log.ui.warning("Creating panel without database manager — call setDatabaseManager first")
             return
         }
@@ -77,43 +53,19 @@ final class SessionPanelController {
         let defaultFrame = NSRect(x: 0, y: 0, width: 340, height: 300)
         let sessionPanel = SessionPanel(contentRect: defaultFrame)
 
-        // -- Session content (main item) --
         let sessionView = SessionContentView(viewModel: viewModel)
         let sessionHosting = NSHostingController(rootView: sessionView)
-
-        let sessionItem = NSSplitViewItem(viewController: sessionHosting)
-        sessionItem.minimumThickness = 280
-        sessionItem.canCollapse = false
-
-        // -- Settings inspector (right-side drawer) --
-        let settingsView = SettingsDrawerView(viewModel: settingsViewModel) { [weak self] in
-            self?.toggleSettings()
-        }
-        let settingsHosting = NSHostingController(rootView: settingsView)
-
-        let inspector = NSSplitViewItem(inspectorWithViewController: settingsHosting)
-        inspector.minimumThickness = 440
-        inspector.maximumThickness = 600
-        inspector.preferredThicknessFraction = 0.55
-        inspector.isCollapsed = true
-        self.inspectorItem = inspector
-
-        // -- Split view controller --
-        let splitVC = NSSplitViewController()
-        splitVC.addSplitViewItem(sessionItem)
-        splitVC.addSplitViewItem(inspector)
-        splitVC.splitView.dividerStyle = .thin
-        splitVC.splitView.autosaveName = "WhippetSplitView"
-        self.splitViewController = splitVC
-
-        sessionPanel.contentViewController = splitVC
+        // Don't let the hosting controller auto-resize the window at all
+        sessionHosting.sizingOptions = []
+        sessionPanel.contentViewController = sessionHosting
+        hostingController = sessionHosting
 
         // Wire callbacks
         sessionPanel.onCloseButtonPressed = { [weak self] in
             self?.promptQuit()
         }
         sessionPanel.onSettingsButtonPressed = { [weak self] in
-            self?.toggleSettings()
+            self?.onSettingsButtonPressed?()
         }
 
         // Set autosave name BEFORE restoring frame
@@ -123,10 +75,30 @@ final class SessionPanelController {
             sessionPanel.center()
         }
 
-        // Lock horizontal width initially (inspector starts collapsed)
-        sessionPanel.lockedWidth = sessionPanel.frame.width
-
         panel = sessionPanel
+
+        // The hosting view fills the window via autoresizing mask (default).
+        // We observe its intrinsic content size to resize the window height only.
+        sizeObservation = sessionHosting.view.observe(\.intrinsicContentSize, options: [.new]) { [weak self] view, _ in
+            let fittingHeight = view.intrinsicContentSize.height
+            if fittingHeight > 0 {
+                DispatchQueue.main.async {
+                    self?.updatePanelHeight(to: fittingHeight)
+                }
+            }
+        }
+    }
+
+    private func updatePanelHeight(to contentHeight: CGFloat) {
+        guard let panel else { return }
+        let newHeight = min(max(contentHeight, 80), 800)
+        var frame = panel.frame
+        guard abs(frame.height - newHeight) > 1 else { return }
+        // Adjust origin.y so the top edge stays put
+        frame.origin.y -= (newHeight - frame.height)
+        frame.size.height = newHeight
+        // Keep width unchanged
+        panel.setFrame(frame, display: true, animate: false)
     }
 
     // MARK: - Visibility
@@ -157,62 +129,6 @@ final class SessionPanelController {
         panel.saveFrame(usingName: Self.frameAutosaveName)
         panel.orderOut(nil)
         Log.ui.debug("Panel hidden")
-    }
-
-    // MARK: - Settings Inspector
-
-    func toggleSettings() {
-        guard let inspector = inspectorItem, let panel = panel else { return }
-
-        // Unlock horizontal resize for the duration of the animation
-        panel.lockedWidth = nil
-
-        if inspector.isCollapsed {
-            // Opening: record current origin so we can restore on close
-            preInspectorOrigin = panel.frame.origin
-            postInspectorOpenOrigin = nil
-
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.2
-                context.allowsImplicitAnimation = true
-                inspector.animator().isCollapsed = false
-            }, completionHandler: { [weak self] in
-                // Record where the window ended up after the system adjusted for screen bounds
-                self?.postInspectorOpenOrigin = self?.panel?.frame.origin
-                // Leave lockedWidth = nil so user can resize while inspector is open
-            })
-        } else {
-            // Closing: check if the user moved the window since it was opened
-            let shouldRestore: Bool = {
-                guard let pre = preInspectorOrigin, let post = postInspectorOpenOrigin else { return false }
-                let current = panel.frame.origin
-                // If the window is still where the system put it (within 1pt tolerance), restore
-                return abs(current.x - post.x) < 1 && abs(current.y - post.y) < 1
-            }()
-
-            let restoreOrigin = shouldRestore ? preInspectorOrigin : nil
-
-            NSAnimationContext.runAnimationGroup({ context in
-                context.duration = 0.2
-                context.allowsImplicitAnimation = true
-                inspector.animator().isCollapsed = true
-
-                if let origin = restoreOrigin {
-                    var newFrame = panel.frame
-                    newFrame.origin = origin
-                    panel.animator().setFrame(newFrame, display: true)
-                }
-            }, completionHandler: { [weak self] in
-                self?.preInspectorOrigin = nil
-                self?.postInspectorOpenOrigin = nil
-                // Lock width now that inspector is collapsed
-                self?.panel?.lockedWidth = self?.panel?.frame.width
-            })
-        }
-    }
-
-    var isSettingsVisible: Bool {
-        inspectorItem?.isCollapsed == false
     }
 
     // MARK: - Quit Confirmation

@@ -50,12 +50,20 @@ final class SettingsWindowController {
         let launchAtLoginManager = LaunchAtLoginManager(databaseManager: databaseManager)
         let vm = SettingsViewModel(databaseManager: databaseManager, launchAtLoginManager: launchAtLoginManager)
 
-        // Wire up callbacks so changes take effect immediately on the session panel
+        // Wire up callbacks so changes take effect immediately
         vm.onAlwaysOnTopChanged = { [weak self] isFloating in
             self?.panelController?.isFloating = isFloating
         }
         vm.onTransparencyChanged = { [weak self] alpha in
             self?.panelController?.transparency = alpha
+        }
+        vm.onAppearanceModeChanged = { mode in
+            switch mode {
+            case "light": NSApp.appearance = NSAppearance(named: .aqua)
+            case "dark": NSApp.appearance = NSAppearance(named: .darkAqua)
+            default: NSApp.appearance = nil
+            }
+            Log.app.info("Appearance mode: \(mode, privacy: .public)")
         }
 
         self.viewModel = vm

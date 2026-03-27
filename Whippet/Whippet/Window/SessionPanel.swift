@@ -13,9 +13,6 @@ final class SessionPanel: NSPanel, NSWindowDelegate {
     /// Called when the user clicks the gear icon in the title bar.
     var onSettingsButtonPressed: (() -> Void)?
 
-    /// When set, user-initiated horizontal resizing is locked to this width.
-    /// Set to nil to allow free horizontal resize (e.g. while inspector is open).
-    var lockedWidth: CGFloat?
 
     // MARK: - Initialization
 
@@ -35,16 +32,6 @@ final class SessionPanel: NSPanel, NSWindowDelegate {
 
         delegate = self
         configureDefaults()
-        addTitleBarAccessory()
-    }
-
-    // MARK: - NSWindowDelegate
-
-    func windowWillResize(_ sender: NSWindow, to frameSize: NSSize) -> NSSize {
-        if let locked = lockedWidth {
-            return NSSize(width: locked, height: frameSize.height)
-        }
-        return frameSize
     }
 
     // MARK: - Configuration

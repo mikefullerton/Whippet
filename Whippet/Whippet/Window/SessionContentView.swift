@@ -49,7 +49,7 @@ struct SessionContentView: View {
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .frame(minWidth: 280)
+        .frame(maxWidth: .infinity, alignment: .top)
         .animation(.easeInOut(duration: 0.2), value: viewModel.lastActionError)
     }
 
@@ -71,40 +71,18 @@ struct SessionContentView: View {
     // MARK: - Session List
 
     private var sessionList: some View {
-        VStack(spacing: 0) {
-            // Compact header
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(.green)
-                    .frame(width: 6, height: 6)
-                    .opacity(viewModel.activeSessionCount > 0 ? 1 : 0)
-
-                Text("\(viewModel.sessionCount) session\(viewModel.sessionCount == 1 ? "" : "s")")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-
-                if viewModel.activeSessionCount > 0 {
-                    Text("\(viewModel.activeSessionCount) active")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(.green)
-                }
-
-                Spacer()
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-
-            Divider().opacity(0.3)
-
-            ScrollView {
-                VStack(spacing: 10) {
-                    ForEach(viewModel.groups) { group in
-                        SessionGroupView(group: group, onSessionClick: viewModel.handleSessionClick)
-                    }
-                }
-                .padding(8)
+        VStack(spacing: 10) {
+            ForEach(viewModel.groups) { group in
+                SessionGroupView(
+                    group: group,
+                    onSessionClick: viewModel.handleSessionClick,
+                    summarizingSessionIds: viewModel.summarizingSessionIds,
+                    onSummarize: viewModel.summarizeSession,
+                    frontmostSessionId: viewModel.frontmostSessionId
+                )
             }
         }
+        .padding(8)
     }
 }
 
@@ -115,18 +93,16 @@ struct SessionContentView: View {
 struct SessionGroupView: View {
     let group: SessionGroup
     var onSessionClick: ((Session) -> Void)?
+    var summarizingSessionIds: Set<String> = []
+    var onSummarize: ((Session) -> Void)?
+    var frontmostSessionId: String?
 
     var body: some View {
         VStack(spacing: 0) {
             // Header
             HStack(spacing: 5) {
-                Circle()
-                    .fill(group.hasActiveSessions ? .green :
-                          group.hasStaleSessions ? .orange : .gray.opacity(0.4))
-                    .frame(width: 6, height: 6)
-
                 Text(group.projectName)
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(.primary)
 
                 Spacer()
@@ -153,12 +129,14 @@ struct SessionGroupView: View {
                     .padding(.vertical, 6)
             } else {
                 ForEach(group.sessions, id: \.sessionId) { session in
-                    SessionRowView(session: session, onTap: onSessionClick)
-                    if session.sessionId != group.sessions.last?.sessionId {
-                        Divider()
-                            .opacity(0.1)
-                            .padding(.leading, 24)
-                    }
+                    SessionRowView(
+                        session: session,
+                        onTap: onSessionClick,
+                        isSummarizing: summarizingSessionIds.contains(session.sessionId),
+                        onSummarize: onSummarize,
+                        isFrontmost: session.sessionId == frontmostSessionId
+                    )
+                    Divider().opacity(0.15)
                 }
             }
         }
@@ -176,94 +154,50 @@ struct SessionGroupView: View {
 struct SessionRowView: View {
     let session: Session
     var onTap: ((Session) -> Void)?
-    @State private var isHovered = false
+    var isSummarizing: Bool = false
+    var onSummarize: ((Session) -> Void)?
+    var isFrontmost: Bool = false
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
-            statusIndicator
+        Button { onTap?(session) } label: {
+            HStack(alignment: .center, spacing: 6) {
+                Circle()
+                    .fill(isFrontmost ? Color.blue : Color.clear)
+                    .frame(width: 6, height: 6)
 
-            VStack(alignment: .leading, spacing: 2) {
-                HStack {
-                    // Primary label: branch, summary, or fallback
-                    if !session.gitBranch.isEmpty {
-                        Label(session.gitBranch, systemImage: "arrow.triangle.branch")
-                            .font(.system(size: 11))
-                            .lineLimit(1)
-                    } else {
-                        Text(session.displayLabel)
-                            .font(.system(size: 11))
-                            .lineLimit(1)
-                            .truncationMode(.tail)
+                if isSummarizing {
+                    HStack(spacing: 4) {
+                        ProgressView()
+                            .controlSize(.mini)
+                        Text("Summarizing...")
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundStyle(.secondary)
                     }
-
-                    Spacer()
-
-                    if !session.model.isEmpty {
-                        Text(abbreviatedModel(session.model))
-                            .font(.system(size: 9))
-                            .foregroundStyle(.tertiary)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 1)
-                            .background(.white.opacity(0.06))
-                            .clipShape(RoundedRectangle(cornerRadius: 3))
-                    }
+                } else {
+                    Text(session.displayLabel)
+                        .font(.system(size: 11, design: .monospaced))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
 
-                HStack(spacing: 6) {
-                    // Summary (user prompt) if we have branch + summary
-                    if !session.gitBranch.isEmpty && !session.summary.isEmpty {
-                        Text(session.summary)
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    } else if !session.lastTool.isEmpty {
-                        Label(session.lastTool, systemImage: "wrench")
-                            .font(.system(size: 10))
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
-                    }
+                Spacer()
 
-                    Spacer()
-
-                    Text(relativeTime(session.lastActivityAt))
-                        .font(.system(size: 10))
-                        .foregroundStyle(.tertiary)
-                }
+                Text(relativeTime(session.lastActivityAt))
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundStyle(.tertiary)
             }
+            .padding(.leading, 16)
+            .padding(.trailing, 10)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .contentShape(Rectangle())
-        .background(isHovered ? Color.white.opacity(0.06) : Color.clear)
-        .onHover { isHovered = $0 }
-        .onTapGesture { onTap?(session) }
-    }
-
-    private var statusIndicator: some View {
-        Group {
-            switch session.status {
-            case .active:
-                Circle()
-                    .fill(.green)
-                    .frame(width: 7, height: 7)
-            case .stale:
-                Circle()
-                    .fill(.orange)
-                    .frame(width: 7, height: 7)
-            case .ended:
-                Circle()
-                    .strokeBorder(.secondary.opacity(0.5), lineWidth: 1)
-                    .frame(width: 7, height: 7)
+        .buttonStyle(SessionRowButtonStyle())
+        .contextMenu {
+            Button("Summarize with AI") {
+                onSummarize?(session)
             }
+            .disabled(isSummarizing)
         }
-    }
-
-    private func abbreviatedModel(_ model: String) -> String {
-        if model.contains("opus") { return "opus" }
-        if model.contains("sonnet") { return "sonnet" }
-        if model.contains("haiku") { return "haiku" }
-        return model.components(separatedBy: "-").prefix(2).joined(separator: "-")
     }
 
     private func relativeTime(_ timestamp: String) -> String {
@@ -285,5 +219,22 @@ struct SessionRowView: View {
         if interval < 3600 { return "\(Int(interval / 60))m" }
         if interval < 86400 { return "\(Int(interval / 3600))h" }
         return "\(Int(interval / 86400))d"
+    }
+}
+
+// MARK: - Session Row Button Style
+
+/// A button style that provides hover and press feedback for session rows.
+struct SessionRowButtonStyle: ButtonStyle {
+    @State private var isHovered = false
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(
+                configuration.isPressed
+                    ? Color.white.opacity(0.12)
+                    : isHovered ? Color.white.opacity(0.06) : Color.clear
+            )
+            .onHover { isHovered = $0 }
     }
 }

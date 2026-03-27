@@ -319,6 +319,12 @@ struct NotificationsSettingsPane: View {
 
 struct AISettingsPane: View {
     @ObservedObject var viewModel: SettingsViewModel
+    @StateObject private var chatViewModel: MiniChatViewModel
+
+    init(viewModel: SettingsViewModel) {
+        self.viewModel = viewModel
+        self._chatViewModel = StateObject(wrappedValue: MiniChatViewModel(settingsViewModel: viewModel))
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -399,8 +405,67 @@ struct AISettingsPane: View {
                 Text("API Key")
                     .font(.headline)
 
-                SecureField(viewModel.aiProvider.apiKeyPlaceholder, text: $viewModel.aiAPIKey)
-                    .textFieldStyle(.roundedBorder)
+                if viewModel.hasStoredAPIKey && viewModel.aiAPIKey.isEmpty {
+                    // Key exists in Keychain — show masked indicator
+                    HStack {
+                        Text("\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}\u{2022}")
+                            .foregroundStyle(.secondary)
+                            .font(.system(.body, design: .monospaced))
+
+                        Spacer()
+
+                        Button("Clear") {
+                            viewModel.clearAPIKey()
+                        }
+                        .controlSize(.small)
+                    }
+                    .padding(6)
+                    .background(.quaternary.opacity(0.3))
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                }
+
+                SecureField(
+                    viewModel.hasStoredAPIKey ? "Enter new key to replace" : viewModel.aiProvider.apiKeyPlaceholder,
+                    text: $viewModel.aiAPIKey
+                )
+                .textFieldStyle(.roundedBorder)
+
+                HStack(spacing: 8) {
+                    Button("Test API Key") {
+                        viewModel.testAPIKey()
+                    }
+                    .disabled(
+                        (!viewModel.hasStoredAPIKey && viewModel.aiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        || viewModel.apiKeyTestState == .testing
+                    )
+                    .controlSize(.small)
+
+                    switch viewModel.apiKeyTestState {
+                    case .idle:
+                        EmptyView()
+                    case .testing:
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Testing...")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    case .success:
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .font(.caption)
+                        Text("API key is valid")
+                            .font(.caption)
+                            .foregroundStyle(.green)
+                    case .failed(let message):
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundStyle(.red)
+                            .font(.caption)
+                        Text(message)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                            .lineLimit(2)
+                    }
+                }
             }
 
             // Custom base URL (only for custom provider)
@@ -416,6 +481,27 @@ struct AISettingsPane: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Divider()
+
+            // Quick Chat
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Quick Chat")
+                        .font(.headline)
+                    Spacer()
+                    if !chatViewModel.messages.isEmpty {
+                        Button("Clear") {
+                            chatViewModel.clearHistory()
+                        }
+                        .controlSize(.small)
+                        .buttonStyle(.plain)
+                        .foregroundStyle(.secondary)
+                    }
+                }
+
+                MiniChatView(viewModel: chatViewModel)
             }
         }
     }

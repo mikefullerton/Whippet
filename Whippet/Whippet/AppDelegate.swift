@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 
 class AppDelegate: NSObject, NSApplicationDelegate {
 
@@ -8,12 +9,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var hookInstaller: HookInstaller?
     private var livenessMonitor: SessionLivenessMonitor?
     private var notificationManager: NotificationManager?
+    private var sessionSummarizer: SessionSummarizer?
     private(set) var panelController = SessionPanelController()
+    private var settingsWindowController = SettingsWindowController()
+    private var summarizerDebugWindowController = SummarizerDebugWindowController()
 
     // MARK: - App Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Log.app.info("Whippet launching")
+
+        // Request accessibility before switching to accessory mode so macOS
+        // can present the system prompt while the app is still a regular app.
+        requestAccessibilityIfNeeded()
+
+        // Hide dock icon at runtime instead of via Info.plist LSUIElement.
+        NSApp.setActivationPolicy(.accessory)
+        Log.app.debug("Activation policy set to .accessory (no dock icon)")
+
         setupMenuBar()
         setupDatabase()
         setupPanelController()
@@ -30,6 +43,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         livenessMonitor?.stop()
         ingestionManager?.stop()
         Log.app.info("Whippet shutdown complete")
+    }
+
+    func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
+        false
+    }
+
+    // MARK: - Accessibility
+
+    private func requestAccessibilityIfNeeded() {
+        let trusted = AXIsProcessTrusted()
+        Log.app.info("AXIsProcessTrusted: \(trusted)")
+
+        if !trusted {
+            Log.app.info("Requesting Accessibility permission via prompt")
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
+            let result = AXIsProcessTrustedWithOptions(options)
+            Log.app.info("AXIsProcessTrustedWithOptions returned: \(result)")
+        }
     }
 
     // MARK: - Database
@@ -51,6 +82,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         panelController.setDatabaseManager(db)
+
+        // Configure the standalone settings window
+        settingsWindowController.configure(databaseManager: db, panelController: panelController)
+
+        // Wire the gear button on the session panel to open the settings window
+        panelController.onSettingsButtonPressed = { [weak self] in
+            self?.settingsWindowController.showSettings()
+        }
 
         // Apply saved appearance mode
         if let mode = try? db.getSetting(key: SettingsViewModel.appearanceModeKey) {
@@ -107,6 +146,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         ingestionManager = EventIngestionManager(databaseManager: db)
 
+        // Set up AI session summarizer
+        sessionSummarizer = SessionSummarizer(databaseManager: db)
+        ingestionManager?.sessionSummarizer = sessionSummarizer
+        panelController.viewModel?.sessionSummarizer = sessionSummarizer
+
         // Wire per-event callback for notifications
         ingestionManager?.onEventIngested = { [weak self] eventType, sessionId, projectName in
             guard let nm = self?.notificationManager else { return }
@@ -125,6 +169,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             Log.app.error("Failed to start event ingestion: \(error.localizedDescription, privacy: .public)")
         }
+
+        // Summarize any existing sessions on launch
+        ingestionManager?.summarizeExistingSessions()
     }
 
     // MARK: - Liveness Monitor
@@ -140,6 +187,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Wire per-session stale callback for notifications
         livenessMonitor?.onSessionMarkedStale = { [weak self] sessionId, projectName in
             self?.notificationManager?.notifySessionStale(sessionId: sessionId, projectName: projectName)
+        }
+
+        // Wire per-session process-died callback for notifications
+        livenessMonitor?.onSessionProcessDied = { [weak self] sessionId, projectName in
+            self?.notificationManager?.notifySessionEnd(sessionId: sessionId, projectName: projectName)
         }
 
         livenessMonitor?.start()
@@ -164,6 +216,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(
             NSMenuItem(title: "Settings...", action: #selector(openSettings), keyEquivalent: "")
         )
+        menu.addItem(
+            NSMenuItem(title: "Summarizer Debug Log", action: #selector(showSummarizerDebug), keyEquivalent: "d")
+        )
+        menu.addItem(
+            NSMenuItem(title: "Test Window Activation", action: #selector(testWindowActivation), keyEquivalent: "t")
+        )
         menu.addItem(NSMenuItem.separator())
         menu.addItem(
             NSMenuItem(title: "Quit Whippet", action: #selector(quitApp), keyEquivalent: "q")
@@ -182,8 +240,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func openSettings() {
         Log.ui.debug("Menu action: Settings")
+        settingsWindowController.showSettings()
+    }
+
+    @objc private func showSummarizerDebug() {
+        Log.ui.debug("Menu action: Summarizer Debug Log")
+        summarizerDebugWindowController.showWindow()
+    }
+
+    @objc private func testWindowActivation() {
+        Log.ui.debug("Menu action: Test Window Activation")
         panelController.showPanel()
-        panelController.toggleSettings()
+        panelController.viewModel?.testActivation()
     }
 
     @objc private func quitApp() {

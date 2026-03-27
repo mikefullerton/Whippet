@@ -14,6 +14,8 @@ struct Session: Equatable {
     var status: SessionStatus
     var gitBranch: String
     var summary: String
+    var pid: Int32
+    var termProgram: String
 
     init(
         id: Int? = nil,
@@ -25,7 +27,9 @@ struct Session: Equatable {
         lastTool: String = "",
         status: SessionStatus = .active,
         gitBranch: String = "",
-        summary: String = ""
+        summary: String = "",
+        pid: Int32 = 0,
+        termProgram: String = ""
     ) {
         self.id = id
         self.sessionId = sessionId
@@ -37,6 +41,8 @@ struct Session: Equatable {
         self.status = status
         self.gitBranch = gitBranch
         self.summary = summary
+        self.pid = pid
+        self.termProgram = termProgram
     }
 
     /// Returns the best available description for this session.

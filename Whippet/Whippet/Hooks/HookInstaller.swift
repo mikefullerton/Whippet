@@ -216,20 +216,37 @@ final class HookInstaller {
         // The stdin payload varies by event type but always contains session_id and cwd.
         let jqFilter = makeJqFilter(eventType: eventType)
 
+        // SessionStart captures extra process info ($PPID and $TERM_PROGRAM) so we can
+        // detect dead sessions later by checking if the originating process is still alive.
+        let extraCaptures = eventType == "SessionStart"
+            ? "HOOK_PPID=$PPID\nHOOK_TERM=${TERM_PROGRAM:-}"
+            : ""
+        let jqArgs = eventType == "SessionStart"
+            ? #" --arg ppid "$HOOK_PPID" --arg term "$HOOK_TERM""#
+            : ""
+
         // The command:
         // - Reads stdin into a variable
         // - Constructs a filename with timestamp and a random suffix
         // - Pipes the input through jq to build the event JSON
         // - Writes to the drop directory
         // - The marker comment is on the first line so we can detect Whippet hooks
-        let command = """
+        var command = """
         \(Self.whippetMarker)
         INPUT=$(cat)
         TIMESTAMP=$(date +%s%N 2>/dev/null || date +%s)
         RAND=$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \\n' 2>/dev/null || echo $$)
         DIR=\(dropDirectory)
         mkdir -p "$DIR"
-        OUTPUT=$(echo "$INPUT" | jq -c '\(jqFilter)' 2>/dev/null)
+        """
+
+        if !extraCaptures.isEmpty {
+            command += "\n\(extraCaptures)"
+        }
+
+        command += """
+
+        OUTPUT=$(echo "$INPUT" | jq -c\(jqArgs) '\(jqFilter)' 2>/dev/null)
         [ -n "$OUTPUT" ] && echo "$OUTPUT" > "$DIR/${TIMESTAMP}-${RAND}.json"
         exit 0
         """
@@ -245,7 +262,7 @@ final class HookInstaller {
         switch eventType {
         case "SessionStart":
             return """
-            {event: "\(eventType)", session_id: .session_id, timestamp: (now | todate), data: {cwd: .cwd, model: (.model // ""), source: (.source // "")}}
+            {event: "\(eventType)", session_id: .session_id, timestamp: (now | todate), data: {cwd: .cwd, model: (.model // ""), source: (.source // ""), pid: ($ppid | tonumber), term_program: $term}}
             """
 
         case "SessionEnd":

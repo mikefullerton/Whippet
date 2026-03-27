@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import os
 
 /// Supported AI providers for session summarization.
 enum AIProvider: String, CaseIterable, Identifiable {
@@ -240,6 +241,7 @@ final class SettingsViewModel: ObservableObject {
     @Published var aiProvider: AIProvider = .anthropic {
         didSet {
             saveSetting(key: Self.aiProviderKey, value: aiProvider.rawValue)
+            apiKeyTestState = .idle
             // Set a sensible default model when switching providers
             if aiModel.isEmpty || !aiProvider.defaultModels.contains(aiModel) {
                 aiModel = aiProvider.defaultModels.first ?? ""
@@ -252,9 +254,33 @@ final class SettingsViewModel: ObservableObject {
         didSet { saveSetting(key: Self.aiModelKey, value: aiModel) }
     }
 
-    /// API key for the selected AI provider.
+    /// The text currently in the API key field. Only contains a value when the user
+    /// is actively entering a new key. NOT pre-populated from Keychain on load.
     @Published var aiAPIKey: String = "" {
-        didSet { saveSetting(key: Self.aiAPIKeyKey, value: aiAPIKey) }
+        didSet {
+            if aiAPIKey.isEmpty {
+                // User cleared the field — don't delete the stored key
+            } else {
+                KeychainHelper.set(aiAPIKey, forKey: Self.aiAPIKeyKey)
+                hasStoredAPIKey = true
+                // Auto-enable AI features when the user enters a key
+                if !aiSummariesEnabled {
+                    aiSummariesEnabled = true
+                }
+            }
+            apiKeyTestState = .idle
+        }
+    }
+
+    /// Whether a key is stored in Keychain. Used to show masked placeholder.
+    @Published var hasStoredAPIKey: Bool = false
+
+    /// Deletes the stored API key from Keychain.
+    func clearAPIKey() {
+        KeychainHelper.delete(forKey: Self.aiAPIKeyKey)
+        hasStoredAPIKey = false
+        aiAPIKey = ""
+        apiKeyTestState = .idle
     }
 
     /// Custom API base URL (only used when provider is .custom).
@@ -266,6 +292,9 @@ final class SettingsViewModel: ObservableObject {
     @Published var aiSummariesEnabled: Bool = false {
         didSet { saveSetting(key: Self.aiSummariesEnabledKey, value: aiSummariesEnabled ? "true" : "false") }
     }
+
+    /// The current state of the API key validation test.
+    @Published var apiKeyTestState: APIKeyTestState = .idle
 
     // MARK: - Callbacks
 
@@ -287,6 +316,9 @@ final class SettingsViewModel: ObservableObject {
 
     /// The launch-at-login manager. Nil until configured via `configureLaunchAtLogin`.
     private(set) var launchAtLoginManager: LaunchAtLoginManager?
+
+    /// Suppresses didSet saves during init to avoid overwriting persisted values.
+    private var isLoading = true
 
     // MARK: - Initialization
 
@@ -317,6 +349,7 @@ final class SettingsViewModel: ObservableObject {
         self.aiSummariesEnabled = Self.defaultAISummariesEnabled
 
         loadFromDatabase()
+        isLoading = false
     }
 
     /// Configures the launch-at-login manager after initialization.
@@ -384,8 +417,16 @@ final class SettingsViewModel: ObservableObject {
                 aiModel = value
             }
 
-            if let value = settings[Self.aiAPIKeyKey] {
-                aiAPIKey = value
+            // API key: check Keychain existence (migrate from SQLite if needed).
+            // Never load the actual key into memory just for display.
+            if KeychainHelper.exists(forKey: Self.aiAPIKeyKey) {
+                hasStoredAPIKey = true
+            } else if let sqliteKey = settings[Self.aiAPIKeyKey], !sqliteKey.isEmpty {
+                // Migrate from insecure SQLite storage to Keychain
+                KeychainHelper.set(sqliteKey, forKey: Self.aiAPIKeyKey)
+                try? databaseManager.deleteSetting(key: Self.aiAPIKeyKey)
+                hasStoredAPIKey = true
+                Log.settings.info("Migrated API key from SQLite to Keychain")
             }
 
             if let value = settings[Self.aiBaseURLKey] {
@@ -410,6 +451,7 @@ final class SettingsViewModel: ObservableObject {
 
     /// Persists a single setting to the database.
     private func saveSetting(key: String, value: String) {
+        guard !isLoading else { return }
         do {
             try databaseManager.setSetting(key: key, value: value)
         } catch {
@@ -440,4 +482,68 @@ final class SettingsViewModel: ObservableObject {
         }
         return "\(minutes)m \(remainingSeconds)s"
     }
+
+    // MARK: - API Key Validation
+
+    /// Sends a minimal API request to verify the configured API key is valid.
+    func testAPIKey() {
+        // Use the field value if the user just typed a key, otherwise read from Keychain
+        let fieldKey = aiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let key = !fieldKey.isEmpty ? fieldKey : (KeychainHelper.get(forKey: Self.aiAPIKeyKey) ?? "")
+        guard !key.isEmpty else {
+            apiKeyTestState = .failed("No API key entered")
+            return
+        }
+
+        apiKeyTestState = .testing
+
+        let provider = aiProvider
+        let model = aiModel
+        let baseURL = aiBaseURL
+
+        Task.detached(priority: .userInitiated) {
+            do {
+                let config = AIRequestConfig(
+                    provider: provider, model: model, apiKey: key,
+                    customBaseURL: baseURL, maxTokens: 1, timeoutInterval: 15
+                )
+                let request = try AIRequestBuilder.buildRequest(
+                    config: config,
+                    messages: [["role": "user", "content": "Hi"]]
+                )
+
+                let (data, response) = try await URLSession.shared.data(for: request)
+
+                guard let http = response as? HTTPURLResponse else {
+                    throw AIRequestError.invalidResponse
+                }
+
+                if http.statusCode == 200 || http.statusCode == 201 {
+                    await MainActor.run { self.apiKeyTestState = .success }
+                    Log.settings.info("API key test succeeded for \(provider.rawValue, privacy: .public)")
+                } else {
+                    let body = String(data: data, encoding: .utf8) ?? ""
+                    let message = AIRequestBuilder.parseErrorMessage(from: body, statusCode: http.statusCode)
+                    await MainActor.run { self.apiKeyTestState = .failed(message) }
+                    Log.settings.warning("API key test failed: HTTP \(http.statusCode) — \(message, privacy: .public)")
+                }
+            } catch let error as AIRequestError {
+                await MainActor.run { self.apiKeyTestState = .failed(error.localizedDescription) }
+            } catch {
+                await MainActor.run { self.apiKeyTestState = .failed(error.localizedDescription) }
+                Log.settings.error("API key test error: \(error.localizedDescription, privacy: .public)")
+            }
+        }
+    }
 }
+
+// MARK: - API Key Test State
+
+/// The state of an API key validation test.
+enum APIKeyTestState: Equatable {
+    case idle
+    case testing
+    case success
+    case failed(String)
+}
+

@@ -41,6 +41,15 @@ final class EventIngestionManager {
     /// session ID, and project name. Used by NotificationManager to fire per-event notifications.
     var onEventIngested: ((_ eventType: String, _ sessionId: String, _ projectName: String) -> Void)?
 
+    /// The session summarizer for generating AI summaries when sessions end.
+    var sessionSummarizer: SessionSummarizer?
+
+    /// Tracks pending summarization work items per session to debounce rapid events.
+    private var summarizeWorkItems: [String: DispatchWorkItem] = [:]
+
+    /// Delay before triggering summarization after the last event for a session.
+    static let summarizeDebounceInterval: TimeInterval = 3.0
+
     /// Minimum file age (in seconds) before attempting to read it.
     /// This handles the case where a file is still being written.
     static let minimumFileAge: TimeInterval = 0.1
@@ -296,6 +305,10 @@ final class EventIngestionManager {
             )
         }
 
+        // Trigger AI summarization on every event (debounced).
+        // SessionEnd fires immediately; other events wait for the debounce interval.
+        scheduleSummarization(sessionId: eventFile.sessionId, immediate: eventFile.event == "SessionEnd")
+
         // Notify per-event callback (used for notifications)
         let projectName = session.projectName
         onEventIngested?(eventFile.event, eventFile.sessionId, projectName)
@@ -310,6 +323,10 @@ final class EventIngestionManager {
 
         let status: SessionStatus = eventFile.event == "SessionEnd" ? .ended : .active
 
+        // Extract process info from SessionStart events (captured by hook script)
+        let pid = (eventFile.data["pid"] as? NSNumber)?.int32Value ?? 0
+        let termProgram = eventFile.data["term_program"] as? String ?? ""
+
         return Session(
             sessionId: eventFile.sessionId,
             cwd: cwd,
@@ -318,8 +335,65 @@ final class EventIngestionManager {
             lastActivityAt: eventFile.timestamp,
             lastTool: lastTool,
             status: status,
-            gitBranch: gitBranch
+            gitBranch: gitBranch,
+            pid: pid,
+            termProgram: termProgram
         )
+    }
+
+    // MARK: - Summarization Scheduling
+
+    /// Debounced trigger for AI summarization. Cancels any pending work for the same session.
+    /// `immediate` skips the debounce (used for SessionEnd).
+    private func scheduleSummarization(sessionId: String, immediate: Bool) {
+        guard let summarizer = sessionSummarizer else { return }
+
+        // Cancel any pending debounced work for this session
+        summarizeWorkItems[sessionId]?.cancel()
+        summarizeWorkItems[sessionId] = nil
+
+        let work = {
+            SummarizerDebugLog.shared.append("Debounce fired — summarizing \(sessionId)")
+            Task.detached(priority: .utility) {
+                await summarizer.summarizeAndStore(sessionId: sessionId)
+            }
+        }
+
+        if immediate {
+            SummarizerDebugLog.shared.append("Immediate summarize for \(sessionId) (SessionEnd)")
+            work()
+        } else {
+            let item = DispatchWorkItem { work() }
+            summarizeWorkItems[sessionId] = item
+            processingQueue.asyncAfter(
+                deadline: .now() + Self.summarizeDebounceInterval,
+                execute: item
+            )
+        }
+    }
+
+    /// Summarizes all sessions that have events. Call once on app launch.
+    /// Processes sessions sequentially to avoid concurrent SQLite access.
+    func summarizeExistingSessions() {
+        guard let summarizer = sessionSummarizer else {
+            SummarizerDebugLog.shared.append("summarizeExistingSessions: summarizer is nil")
+            return
+        }
+
+        Task.detached(priority: .utility) {
+            guard let sessions = try? self.databaseManager.fetchAllSessions() else {
+                SummarizerDebugLog.shared.append("summarizeExistingSessions: failed to fetch sessions")
+                return
+            }
+            SummarizerDebugLog.shared.append("summarizeExistingSessions: \(sessions.count) session(s) total")
+
+            for session in sessions {
+                SummarizerDebugLog.shared.append("  summarizing: \(session.sessionId) (\(session.status.rawValue))")
+                await summarizer.summarizeAndStore(sessionId: session.sessionId)
+                // Rate-limit: ~1 request per second to avoid hammering the API
+                try? await Task.sleep(for: .seconds(1))
+            }
+        }
     }
 
     // MARK: - Error Handling

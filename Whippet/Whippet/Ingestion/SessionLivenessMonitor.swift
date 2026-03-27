@@ -38,6 +38,10 @@ final class SessionLivenessMonitor {
     /// and project name. Used by NotificationManager to fire per-session stale notifications.
     var onSessionMarkedStale: ((_ sessionId: String, _ projectName: String) -> Void)?
 
+    /// Callback invoked for each session whose originating process has died,
+    /// providing session ID and project name. Used for end-of-session notifications.
+    var onSessionProcessDied: ((_ sessionId: String, _ projectName: String) -> Void)?
+
     // MARK: - Initialization
 
     /// Creates a liveness monitor that uses the given database manager.
@@ -96,8 +100,13 @@ final class SessionLivenessMonitor {
     }
 
     /// Checks all active sessions and marks those that exceed the timeout as stale.
+    /// Also checks if the originating process for each session is still alive.
     /// Posts a sessions-changed notification if any sessions were updated.
     func performLivenessCheck() {
+        // Phase 1: PID-based dead session detection (fast, single syscall per session)
+        let pidDeathCount = performPidLivenessCheck()
+
+        // Phase 2: Timeout-based staleness detection (fallback for sessions without PID)
         let timeout = currentTimeout()
 
         do {
@@ -113,7 +122,9 @@ final class SessionLivenessMonitor {
                 for session in aboutToGoStale {
                     onSessionMarkedStale?(session.sessionId, session.projectName)
                 }
+            }
 
+            if count > 0 || pidDeathCount > 0 {
                 DispatchQueue.main.async {
                     SessionListViewModel.notifySessionsChanged()
                 }
@@ -121,5 +132,43 @@ final class SessionLivenessMonitor {
         } catch {
             Log.liveness.error("Liveness check failed: \(error.localizedDescription, privacy: .public)")
         }
+    }
+
+    /// Checks if the originating process for each tracked session is still alive.
+    /// Returns the number of sessions marked as ended.
+    @discardableResult
+    private func performPidLivenessCheck() -> Int {
+        do {
+            let sessions = try databaseManager.fetchLiveSessionsWithPid()
+            var endedCount = 0
+
+            for session in sessions {
+                if !isProcessAlive(pid: session.pid) {
+                    try databaseManager.updateSessionStatus(
+                        sessionId: session.sessionId,
+                        status: .ended
+                    )
+                    onSessionProcessDied?(session.sessionId, session.projectName)
+                    endedCount += 1
+                    Log.liveness.info("Process \(session.pid) dead — ended session '\(session.projectName, privacy: .public)'")
+                }
+            }
+
+            if endedCount > 0 {
+                Log.liveness.info("Ended \(endedCount) session(s) via PID liveness check")
+            }
+
+            return endedCount
+        } catch {
+            Log.liveness.error("PID liveness check failed: \(error.localizedDescription, privacy: .public)")
+            return 0
+        }
+    }
+
+    /// Checks if a process with the given PID is currently running.
+    /// Uses the POSIX kill(2) system call with signal 0 (no signal sent).
+    private func isProcessAlive(pid: Int32) -> Bool {
+        guard pid > 0 else { return false }
+        return kill(pid, 0) == 0
     }
 }
